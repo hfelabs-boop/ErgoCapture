@@ -6,3 +6,6 @@ out
 next-env.d.ts
 .env*.local
 test-results
+__pycache__/
+.pytest_cache/
+*.pyc
