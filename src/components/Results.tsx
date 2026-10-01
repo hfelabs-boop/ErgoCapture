@@ -179,7 +179,7 @@ export function Results({ a }: { a: SessionAnalysis }) {
               </div>
               {a.views.map((v) => (
                 <p key={v.viewId} className="text-xs text-slate-500">
-                  {v.label}: view angle {Number.isFinite(v.meanYaw) ? `${v.meanYaw.toFixed(0)}°` : "–"} (0° frontal, 90° side), visibility {pct(v.meanVisibility * 100)}
+                  {v.label} ({v.source}): view angle {Number.isFinite(v.meanYaw) ? `${v.meanYaw.toFixed(0)}°` : "–"} (0° frontal, 90° side), visibility {pct(v.meanVisibility * 100)}
                 </p>
               ))}
               <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-slate-500">

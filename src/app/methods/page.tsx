@@ -123,8 +123,14 @@ export default function Methods() {
             <b>On-device (this web app).</b> MediaPipe runs in the browser (GPU when available). Nothing is uploaded; works on phones, laptops and desktops.
           </li>
           <li>
-            <b>Workstation / server tier.</b> Heavier models (RTMW, Sapiens, SMPL-X fitting, calibrated multi-view triangulation with Pose2Sim) can run offline on a GPU and feed
-            their 3D joints into this app through the pose file format; all analysis modules then apply unchanged.
+            <b>Workstation / server tier: SAM 3D Body.</b> Meta&apos;s SAM 3D Body recovers a full 3D body mesh (Momentum Human Rig) with all finger joints from each frame. It
+            is more robust to occlusion, side views and unusual postures, and real knuckle positions make wrist angles reliable (they get 0.9 instead of 0.6 reliability). It
+            needs a CUDA GPU: run the ready-made server in <code>server/sam3d_body</code> (Docker), then pick <b>SAM 3D Body</b> as the pose engine on the Analyze page, or
+            convert videos with its command-line tool and open the resulting <code>.pose.json</code> files.
+          </li>
+          <li>
+            <b>Other server-tier models.</b> RTMW, Sapiens, SMPL-X fitting or calibrated multi-view triangulation (Pose2Sim) can feed their 3D joints through the pose file
+            format; all analysis modules then apply unchanged.
           </li>
           <li>
             <b>Offline / on-premise.</b> The app is a static site; it can be self-hosted on an internal server. Pose model and runtime files are fetched from Google&apos;s and
@@ -139,7 +145,7 @@ export default function Methods() {
 
       <S id="format" title="6. Pose file format (import from other pipelines)">
         <pre className="overflow-x-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">{`{
-  "format": "blazepose33" | "coco17" | "h36m17",
+  "format": "blazepose33" | "coco17" | "h36m17" | "mhr70",
   "fps": 30,
   "units": "m" | "mm",           // default "m"
   "yUp": true,                    // true when +y points up (most 3D lifters / mocap)
@@ -152,7 +158,7 @@ export default function Methods() {
   ]
 }`}</pre>
         <p>
-          COCO-17 and Human3.6M-17 skeletons are mapped onto the 33-point layout; missing hand points are placed along the forearm (wrist angles then read neutral with low
+          <code>mhr70</code> is SAM 3D Body&apos;s 70-keypoint Momentum Human Rig output (camera frame, metres, y down). COCO-17 and Human3.6M-17 skeletons are mapped onto the 33-point layout; missing hand points are placed along the forearm (wrist angles then read neutral with low
           confidence). ErgoCapture session files (&quot;Skeleton-only session&quot; export) can also be re-opened.
         </p>
       </S>
@@ -174,7 +180,12 @@ export default function Methods() {
           <li>Single-camera twist is estimated from monocular depth and is less reliable than bending angles.</li>
           <li>Activity segmentation is rule-based. Learned action recognition belongs to the server tier.</li>
           <li>Holding-time limits in the ISO 11226 module are linear approximations of the standard&apos;s curves; OCRA is implemented as a screening checklist.</li>
-          <li>Licensing: MediaPipe Pose (Apache-2.0) is used on-device and allows commercial use. Some server-tier models (Sapiens, SMPL-X, several 3D lifters) carry non-commercial licences; check before deploying them.</li>
+          <li>
+            Licensing: MediaPipe Pose (Apache-2.0) is used on-device and allows commercial use. SAM 3D Body is under Meta&apos;s SAM License, which permits commercial use
+            subject to its terms; its checkpoints are gated on Hugging Face. Some other server-tier models (Sapiens, SMPL-X, several 3D lifters) carry non-commercial
+            licences; check before deploying them.
+          </li>
+          <li>SAM 3D Body gives no per-keypoint confidence: keypoints inside the frame get 0.9 visibility, ones projected outside it 0.4.</li>
         </ul>
       </S>
     </div>

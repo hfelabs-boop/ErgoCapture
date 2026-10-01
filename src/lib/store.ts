@@ -23,6 +23,8 @@ export interface ViewSource {
   syncEventSec?: number | null;
   status: "idle" | "processing" | "done" | "error";
   progress: number;
+  /** Progress label, e.g. "Uploading", "Queued on server" */
+  phase?: string;
   error?: string;
   processed?: ProcessedView;
   selectedPersonId?: number;
@@ -33,10 +35,17 @@ export interface Privacy {
   skeletonOnly: boolean;
 }
 
+export type PoseEngine = "mediapipe" | "sam3d";
+
 export interface ProcessOptions {
   fps: number;
   variant: ModelVariant;
   maxPersons: number;
+  engine: PoseEngine;
+  /** SAM 3D Body server URL (server/sam3d_body) */
+  endpoint: string;
+  /** Access token for the server; kept in memory only, never persisted */
+  token: string;
 }
 
 interface State {
@@ -61,6 +70,7 @@ interface State {
 }
 
 const SETTINGS_KEY = "ergocapture.settings.v1";
+const PROCESS_KEY = "ergocapture.engine.v1";
 
 function loadSettings(): TaskSettings {
   try {
@@ -75,7 +85,7 @@ export const useStore = create<State>((set, get) => ({
   views: [],
   settings: DEFAULT_SETTINGS,
   calib: {},
-  process: { fps: 10, variant: "full", maxPersons: 2 },
+  process: { fps: 10, variant: "full", maxPersons: 2, engine: "mediapipe", endpoint: "", token: "" },
   privacy: { blurFaces: true, skeletonOnly: false },
   analysis: null,
   title: "Workstation assessment",
@@ -97,7 +107,15 @@ export const useStore = create<State>((set, get) => ({
     set({ settings });
   },
   setCalib: (calib) => set({ calib }),
-  setProcess: (patch) => set({ process: { ...get().process, ...patch } }),
+  setProcess: (patch) => {
+    const process = { ...get().process, ...patch };
+    try {
+      window.localStorage.setItem(PROCESS_KEY, JSON.stringify({ engine: process.engine, endpoint: process.endpoint }));
+    } catch {
+      /* storage unavailable */
+    }
+    set({ process });
+  },
   setPrivacy: (patch) => set({ privacy: { ...get().privacy, ...patch } }),
   setAnalysis: (analysis) => set({ analysis }),
   setTitle: (title) => set({ title }),
@@ -109,7 +127,13 @@ export const useStore = create<State>((set, get) => ({
 
 /** Load persisted settings once on the client. */
 export function hydrateSettings() {
-  useStore.setState({ settings: loadSettings() });
+  let engine: Partial<ProcessOptions> = {};
+  try {
+    engine = JSON.parse(window.localStorage.getItem(PROCESS_KEY) ?? "{}");
+  } catch {
+    /* storage unavailable */
+  }
+  useStore.setState((s) => ({ settings: loadSettings(), process: { ...s.process, ...engine } }));
 }
 
 /** The track chosen for analysis in each processed view. */

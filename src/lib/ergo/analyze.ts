@@ -50,6 +50,7 @@ export interface ScoreSummary {
 export interface ViewQuality {
   viewId: string;
   label: string;
+  source: string;
   coveragePct: number;
   meanVisibility: number;
   meanYaw: number;
@@ -100,7 +101,7 @@ export function processView(track: PoseTrack, settings: TaskSettings, calib: Cal
   if (!skipSmoothing) frames = smoothTrack(frames);
   const modelStature = estimateStature(frames);
   const scale = settings.subjectHeightCm > 0 && modelStature > 0 ? settings.subjectHeightCm / 100 / modelStature : 1;
-  const ms = frames.map((f) => computeFrameMeasures(f, { scale, calib }));
+  const ms = frames.map((f) => computeFrameMeasures(f, { scale, calib, detailedHands: track.detailedHands }));
   addLocomotion(frames, ms);
   return { frames, ms, scale, modelStature };
 }
@@ -219,6 +220,7 @@ export function analyzeSession(input: AnalyzeInput): SessionAnalysis {
     return {
       viewId: tr.viewId,
       label: tr.viewLabel,
+      source: tr.source ?? "MediaPipe Pose",
       coveragePct: ms.length ? (valid.length / ms.length) * 100 : 0,
       meanVisibility: vis.length ? vis.reduce((a, b) => a + b, 0) / vis.length : 0,
       meanYaw: valid.length ? valid.reduce((a, f) => a + f.viewYaw, 0) / valid.length : NaN,
@@ -278,7 +280,8 @@ export function analyzeSession(input: AnalyzeInput): SessionAnalysis {
       notes.push("Single side-on camera: side bending, twisting and the far-side arm are less reliable. A second camera at ~90° improves accuracy.");
   }
   if (!calib.up) notes.push("No neutral-posture calibration: vertical is assumed from the camera's orientation. Keep the camera level.");
-  notes.push("Wrist angles come from coarse hand keypoints; treat wrist sub-scores as indicative.");
+  if (!input.tracks.every((t) => t.detailedHands))
+    notes.push("Wrist angles come from coarse hand keypoints; treat wrist sub-scores as indicative.");
 
   const summary = {
     rula: summarize(rula, frames, range(1, 7)),

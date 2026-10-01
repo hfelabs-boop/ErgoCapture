@@ -95,6 +95,8 @@ export interface MeasureContext {
   /** Multiply world coordinates by this to get metres (from subject stature) */
   scale: number;
   calib: Calibration;
+  /** Hand points come from finger joints (e.g. SAM 3D Body), so wrist angles are more reliable */
+  detailedHands?: boolean;
 }
 
 export const emptyMeasures = (fill = NaN): Measures =>
@@ -264,12 +266,12 @@ export function computeFrameMeasures(frame: PoseFrame, ctx: MeasureContext): Fra
     const vEl = vis(w, S, E, Wr);
     set(`elbowFlex${side}`, 180 - angleBetween(scale(ua, -1), fa), vEl, "joint");
 
-    // Wrist from the pose model's coarse hand points (index, pinky): lower fidelity.
+    // Wrist from the index/pinky knuckles: coarse landmarks (MediaPipe) are down-weighted.
     const handMid = mid(idx, pk);
     const hand = sub(handMid, wr);
     const palmN = normalize(cross(sub(idx, wr), sub(pk, wr)));
     const faN = normalize(fa);
-    const vWr = vis(w, E, Wr, I, Pk) * 0.6;
+    const vWr = vis(w, E, Wr, I, Pk) * (ctx.detailedHands ? 0.9 : 0.6);
     const flex = Math.abs(deg(Math.asin(clamp(dot(faN, palmN), -1, 1))));
     set(`wristFlex${side}`, flex, vWr, "joint");
     const inPlane = angleBetween(reject(fa, palmN), hand);

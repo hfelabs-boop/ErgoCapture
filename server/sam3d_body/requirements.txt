@@ -1,0 +1,7 @@
+# Server tier for ErgoCapture. Install PyTorch (CUDA build) first, then the
+# sam-3d-body dependencies from its INSTALL.md, then:
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+numpy
+opencv-python

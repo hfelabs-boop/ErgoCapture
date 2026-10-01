@@ -6,6 +6,7 @@ import { Button, Card, Field, NumberInput, Progress, Select, Toggle } from "@/co
 import { analyzeSession } from "@/lib/ergo/analyze";
 import { parsePoseJson } from "@/lib/pose/importExport";
 import { demoTrack } from "@/lib/pose/synthetic";
+import { checkServer, processRemote } from "@/lib/pose/remoteProcessor";
 import { processVideo } from "@/lib/pose/videoProcessor";
 import { hydrateSettings, newId, selectedTracks, useStore, type ViewSource } from "@/lib/store";
 import { detectAudioSync, detectFlashSync } from "@/lib/sync";
@@ -97,21 +98,39 @@ function Analyze() {
 
   const run = async () => {
     setError(null);
+    if (s.process.engine === "sam3d" && !s.process.endpoint) {
+      setError("Enter the SAM 3D Body server URL, or switch the pose engine to on-device.");
+      return;
+    }
     setRunning(true);
     abort.current = new AbortController();
     try {
       for (const v of useStore.getState().views) {
         if (v.kind !== "video" || (v.status === "done" && v.processed)) continue;
-        s.updateView(v.id, { status: "processing", progress: 0, error: undefined });
+        s.updateView(v.id, { status: "processing", progress: 0, error: undefined, phase: undefined });
         try {
-          const processed = await processVideo(v.url!, v.id, v.label, {
-            fps: s.process.fps,
-            variant: s.process.variant,
-            maxPersons: s.process.maxPersons,
-            offsetSec: v.offsetSec,
-            signal: abort.current.signal,
-            onProgress: (p) => s.updateView(v.id, { progress: p }),
-          });
+          const processed =
+            s.process.engine === "sam3d"
+              ? await processRemote(v.file!, v.id, v.label, {
+                  endpoint: s.process.endpoint,
+                  token: s.process.token || undefined,
+                  fps: s.process.fps,
+                  offsetSec: v.offsetSec,
+                  signal: abort.current.signal,
+                  onProgress: (p, phase) =>
+                    s.updateView(v.id, {
+                      progress: p,
+                      phase: phase === "upload" ? "Uploading to SAM 3D Body server" : phase === "queued" ? "Queued on server" : "SAM 3D Body running",
+                    }),
+                })
+              : await processVideo(v.url!, v.id, v.label, {
+                  fps: s.process.fps,
+                  variant: s.process.variant,
+                  maxPersons: s.process.maxPersons,
+                  offsetSec: v.offsetSec,
+                  signal: abort.current.signal,
+                  onProgress: (p) => s.updateView(v.id, { progress: p }),
+                });
           s.updateView(v.id, { status: "done", processed, selectedPersonId: processed.tracks[0]?.personId });
         } catch (e) {
           if ((e as Error).name === "AbortError") throw e;
@@ -153,7 +172,8 @@ function Analyze() {
       <div>
         <h1 className="text-2xl font-semibold">Analyze recordings</h1>
         <p className="text-sm text-slate-500">
-          Add 1–4 videos of the same task from different angles (or a saved skeleton session), set the task inputs, and run. Everything is processed in this browser.
+          Add 1–4 videos of the same task from different angles (or a saved skeleton session), set the task inputs, and run.{" "}
+          {s.process.engine === "sam3d" ? "Videos are sent to your SAM 3D Body server for pose estimation; scoring runs in this browser." : "Everything is processed in this browser."}
         </p>
       </div>
       {error && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
@@ -210,20 +230,36 @@ function Analyze() {
             <Field label="Sampling rate" hint="Frames analysed per second of video">
               <Select value={s.process.fps} onChange={(fps) => s.setProcess({ fps })} options={[5, 10, 15, 30].map((f) => ({ value: f, label: `${f} fps` }))} />
             </Field>
-            <Field label="Pose model" hint="Heavy is most accurate and slowest">
+            <Field label="Pose engine">
               <Select
-                value={s.process.variant}
-                onChange={(variant) => s.setProcess({ variant })}
+                value={s.process.engine}
+                onChange={(engine) => s.setProcess({ engine })}
                 options={[
-                  { value: "lite", label: "Lite (fast)" },
-                  { value: "full", label: "Full (balanced)" },
-                  { value: "heavy", label: "Heavy (accurate)" },
+                  { value: "mediapipe", label: "On-device: MediaPipe (private, any device)" },
+                  { value: "sam3d", label: "SAM 3D Body (your GPU server, most accurate)" },
                 ]}
               />
             </Field>
-            <Field label="People to track">
-              <Select value={s.process.maxPersons} onChange={(maxPersons) => s.setProcess({ maxPersons })} options={[1, 2, 3, 4].map((n) => ({ value: n, label: String(n) }))} />
-            </Field>
+            {s.process.engine === "mediapipe" ? (
+              <>
+                <Field label="Pose model" hint="Heavy is most accurate and slowest">
+                  <Select
+                    value={s.process.variant}
+                    onChange={(variant) => s.setProcess({ variant })}
+                    options={[
+                      { value: "lite", label: "Lite (fast)" },
+                      { value: "full", label: "Full (balanced)" },
+                      { value: "heavy", label: "Heavy (accurate)" },
+                    ]}
+                  />
+                </Field>
+                <Field label="People to track">
+                  <Select value={s.process.maxPersons} onChange={(maxPersons) => s.setProcess({ maxPersons })} options={[1, 2, 3, 4].map((n) => ({ value: n, label: String(n) }))} />
+                </Field>
+              </>
+            ) : (
+              <Sam3dServerFields />
+            )}
             <Toggle checked={s.privacy.blurFaces} onChange={(blurFaces) => s.setPrivacy({ blurFaces })} label="Blur faces in review and reports" />
             <Toggle checked={s.privacy.skeletonOnly} onChange={(skeletonOnly) => s.setPrivacy({ skeletonOnly })} label="Skeleton only (never show video)" />
             {s.calib.up && <p className="text-xs text-emerald-700">Neutral-posture calibration from Live mode is active.</p>}
@@ -273,7 +309,7 @@ function ViewRow({ v, index }: { v: ViewSource; index: number }) {
       {v.status === "processing" && (
         <div className="mt-2">
           <Progress value={v.progress} />
-          <div className="mt-1 text-xs text-slate-500">{v.progress === 0 ? "Loading pose model…" : `Estimating pose… ${Math.round(v.progress * 100)}%`}</div>
+          <div className="mt-1 text-xs text-slate-500">{v.phase ? `${v.phase}… ${Math.round(v.progress * 100)}%` : v.progress === 0 ? "Loading pose model…" : `Estimating pose… ${Math.round(v.progress * 100)}%`}</div>
         </div>
       )}
       {v.status === "error" && <p className="mt-2 text-sm text-red-600">{v.error}</p>}
@@ -296,6 +332,39 @@ function ViewRow({ v, index }: { v: ViewSource; index: number }) {
           Ready: {v.processed.tracks.length} person track(s), {v.processed.tracks[0]?.frames.length ?? 0} frames.
         </p>
       )}
+    </div>
+  );
+}
+
+function Sam3dServerFields() {
+  const process = useStore((x) => x.process);
+  const setProcess = useStore((x) => x.setProcess);
+  const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
+  const test = async () => {
+    setStatus(null);
+    try {
+      const h = await checkServer(process.endpoint, process.token || undefined);
+      setStatus({ ok: true, text: `Connected: ${h.model} on ${h.device}` });
+    } catch (e) {
+      setStatus({ ok: false, text: (e as Error).message === "Failed to fetch" ? "Cannot reach server (URL, HTTPS or CORS origins)" : (e as Error).message });
+    }
+  };
+  const inputCls = "w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm";
+  return (
+    <div className="space-y-2 rounded-lg bg-slate-50 p-3">
+      <Field label="Server URL" hint="Your SAM 3D Body server (see server/sam3d_body in the repository)">
+        <input className={inputCls} value={process.endpoint} onChange={(e) => setProcess({ endpoint: e.target.value })} placeholder="https://gpu.example.com" />
+      </Field>
+      <Field label="Access token" hint="Kept in memory only">
+        <input className={inputCls} type="password" value={process.token} onChange={(e) => setProcess({ token: e.target.value })} />
+      </Field>
+      <Button variant="secondary" onClick={test} disabled={!process.endpoint}>
+        Test connection
+      </Button>
+      {status && <p className={`text-xs ${status.ok ? "text-emerald-700" : "text-red-600"}`}>{status.text}</p>}
+      <p className="text-[11px] leading-snug text-slate-500">
+        Videos are uploaded to this server only, deleted after processing, and results come back as 3D keypoints. Use on-device processing when video must not leave the device.
+      </p>
     </div>
   );
 }

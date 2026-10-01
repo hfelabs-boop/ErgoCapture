@@ -36,6 +36,10 @@ export interface PoseTrack {
   width: number;
   height: number;
   frames: PoseFrame[];
+  /** Which pose engine produced the track (e.g. "MediaPipe Pose", "SAM 3D Body") */
+  source?: string;
+  /** True when hand points come from real finger joints rather than coarse hand landmarks */
+  detailedHands?: boolean;
 }
 
 export const KP = {

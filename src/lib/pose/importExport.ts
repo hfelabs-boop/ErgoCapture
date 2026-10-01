@@ -24,25 +24,64 @@ export function makeSessionFile(tracks: PoseTrack[], settings: TaskSettings, cal
 /**
  * Generic pose file:
  * {
- *   "format": "blazepose33" | "coco17" | "h36m17",
+ *   "format": "blazepose33" | "coco17" | "h36m17" | "mhr70",
  *   "fps": 30,
  *   "units": "m" | "mm",          // default m
  *   "yUp": false,                 // true if +y points up (most mocap/3D lifters)
  *   "frames": [ { "t": 0.0, "keypoints3d": [[x,y,z,conf], ...], "keypoints2d": [[u,v,conf], ...] } ]
  * }
  */
+export type PoseFormat = "blazepose33" | "coco17" | "h36m17" | "mhr70";
+
 export interface GenericPoseFile {
-  format: "blazepose33" | "coco17" | "h36m17";
+  format: PoseFormat;
   fps: number;
   units?: "m" | "mm";
   yUp?: boolean;
   width?: number;
   height?: number;
   label?: string;
+  /** Pose engine name shown in reports, e.g. "SAM 3D Body (dinov3)" */
+  source?: string;
   frames: Array<{ t?: number; keypoints3d: number[][] | null; keypoints2d?: number[][] | null }>;
 }
 
 type P = [number, number, number, number];
+
+/**
+ * SAM 3D Body (Meta, 2025) outputs the first 70 Momentum Human Rig keypoints
+ * ("mhr70", see sam_3d_body/metadata/mhr70.py). Fingers give real knuckle
+ * positions, so wrist angles are far better than from coarse landmarks.
+ */
+const MHR70_TO_BP: Record<number, number> = {
+  0: KP.nose,
+  1: KP.leftEye,
+  2: KP.rightEye,
+  3: KP.leftEar,
+  4: KP.rightEar,
+  5: KP.leftShoulder,
+  6: KP.rightShoulder,
+  7: KP.leftElbow,
+  8: KP.rightElbow,
+  9: KP.leftHip,
+  10: KP.rightHip,
+  11: KP.leftKnee,
+  12: KP.rightKnee,
+  13: KP.leftAnkle,
+  14: KP.rightAnkle,
+  15: KP.leftFootIndex, // left big-toe tip
+  17: KP.leftHeel,
+  18: KP.rightFootIndex, // right big-toe tip
+  20: KP.rightHeel,
+  21: KP.rightThumb, // right thumb tip
+  28: KP.rightIndex, // right index third joint (knuckle)
+  40: KP.rightPinky, // right pinky third joint (knuckle)
+  41: KP.rightWrist,
+  42: KP.leftThumb,
+  49: KP.leftIndex,
+  61: KP.leftPinky,
+  62: KP.leftWrist,
+};
 
 const COCO17_TO_BP: Record<number, number> = {
   0: KP.nose,
@@ -144,7 +183,7 @@ function completeSkeleton(bp: (P | null)[], extra?: { head?: P; neck?: P; nose?:
 }
 
 function mapFrame(
-  fmt: GenericPoseFile["format"],
+  fmt: PoseFormat,
   pts: number[][] | null | undefined,
   k: number,
   flipY: boolean,
@@ -157,7 +196,7 @@ function mapFrame(
   const conv = is3d ? P3 : P2;
   if (fmt === "blazepose33") return pts.map((a) => conv(a)).map((p) => ({ x: p[0], y: p[1], z: p[2], v: p[3] }));
   const bp: (P | null)[] = new Array(NUM_KEYPOINTS).fill(null);
-  const table = fmt === "coco17" ? COCO17_TO_BP : H36M_TO_BP;
+  const table = fmt === "coco17" ? COCO17_TO_BP : fmt === "mhr70" ? MHR70_TO_BP : H36M_TO_BP;
   for (const [src, dst] of Object.entries(table)) if (pts[+src]) bp[dst] = conv(pts[+src]);
   if (fmt === "h36m17") return completeSkeleton(bp, { head: pts[10] && conv(pts[10]), nose: pts[9] && conv(pts[9]) });
   return completeSkeleton(bp);
@@ -187,6 +226,8 @@ export function importGenericPose(file: GenericPoseFile, viewId = "import"): Pos
   return {
     viewId,
     viewLabel: file.label ?? `Imported ${file.format}`,
+    source: file.source ?? (file.format === "mhr70" ? "SAM 3D Body" : `Imported ${file.format}`),
+    detailedHands: file.format === "mhr70",
     personId: 1,
     fps: file.fps,
     width: file.width ?? 1280,
@@ -198,6 +239,8 @@ export function importGenericPose(file: GenericPoseFile, viewId = "import"): Pos
 export function parsePoseJson(text: string): { tracks: PoseTrack[]; settings?: TaskSettings; calib?: Calibration } {
   const data = JSON.parse(text);
   if (data?.format === "ergocapture.session") return { tracks: data.tracks, settings: data.settings, calib: data.calib };
-  if (["blazepose33", "coco17", "h36m17"].includes(data?.format)) return { tracks: [importGenericPose(data)] };
-  throw new Error('Unrecognised file. Expected an ErgoCapture session or a pose file with "format": "blazepose33" | "coco17" | "h36m17".');
+  if (["blazepose33", "coco17", "h36m17", "mhr70"].includes(data?.format)) return { tracks: [importGenericPose(data)] };
+  throw new Error(
+    'Unrecognised file. Expected an ErgoCapture session or a pose file with "format": "blazepose33" | "coco17" | "h36m17" | "mhr70".',
+  );
 }

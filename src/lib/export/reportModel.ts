@@ -267,7 +267,7 @@ export function buildSections(a: SessionAnalysis): Section[] {
       `Person detected in ${pct(a.dataQuality.validPct)} of frames; ${pct(a.dataQuality.interpolatedPct)} gap-filled.`,
       ...a.views.map(
         (v) =>
-          `${v.label}: coverage ${pct(v.coveragePct)}, mean keypoint visibility ${pct(v.meanVisibility * 100)}, mean view angle to body ${Number.isFinite(v.meanYaw) ? v.meanYaw.toFixed(0) + "°" : "–"} (0° = frontal, 90° = side).`,
+          `${v.label} (${v.source}): coverage ${pct(v.coveragePct)}, mean keypoint visibility ${pct(v.meanVisibility * 100)}, mean view angle to body ${Number.isFinite(v.meanYaw) ? v.meanYaw.toFixed(0) + "°" : "–"} (0° = frontal, 90° = side).`,
       ),
       ...a.dataQuality.notes,
       "Confidence combines keypoint visibility, how well the camera sees each joint's plane of motion, and score stability: every frame is re-scored with angles perturbed by their estimated error, and the share of re-scores landing on the same risk level is reported.",

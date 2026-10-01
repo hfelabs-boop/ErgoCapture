@@ -39,7 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </header>
         <main className="mx-auto max-w-7xl px-4 py-6">{children}</main>
         <footer className="mx-auto max-w-7xl px-4 pb-8 pt-4 text-xs text-slate-500">
-          Video is processed on this device and never uploaded. ErgoCapture is a screening tool; results should be reviewed by a
+          With on-device processing, video never leaves this device; the optional SAM 3D Body engine sends it only to your own GPU server. ErgoCapture is a screening tool; results should be reviewed by a
           qualified ergonomist.
         </footer>
       </body>

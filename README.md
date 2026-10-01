@@ -25,6 +25,10 @@ This is a standard Next.js app with no server code or environment variables. Imp
 
 The pose model (`pose_landmarker_{lite,full,heavy}.task`) is fetched from Google's CDN and the WASM runtime from jsDelivr at runtime. For offline or on-premise deployment, mirror those files and change `WASM_BASE` / `MODEL_URL` in `src/lib/pose/detector.ts`.
 
+## SAM 3D Body (GPU server tier)
+
+For the most accurate assessments, `server/sam3d_body/` runs Meta's [SAM 3D Body](https://github.com/facebookresearch/sam-3d-body) on a CUDA GPU (Docker image, HTTP job server and CLI). Choose **SAM 3D Body** as the pose engine on the Analyze page and enter your server URL, or convert videos with the CLI and open the `.pose.json` files. It returns a full-body mesh fit with finger joints (`mhr70` keypoints), which improves robustness to occlusion and makes wrist angles reliable. See [server/sam3d_body/README.md](server/sam3d_body/README.md). Vercel only hosts the web app; the GPU server runs on your own hardware or cloud GPU.
+
 ## Architecture
 
 ```
@@ -33,7 +37,8 @@ src/lib/pose/       capture and pose layer
   videoProcessor.ts   offline frame-stepping of recorded video
   tracker.ts          multi-person IoU tracker (stable worker IDs)
   filters.ts          One-Euro smoothing, gap filling
-  importExport.ts     session files; import from BlazePose-33 / COCO-17 / H36M-17 3D output
+  importExport.ts     session files; import from BlazePose-33 / COCO-17 / H36M-17 / SAM 3D Body (MHR-70)
+  remoteProcessor.ts  client for the SAM 3D Body GPU server
   synthetic.ts        forward-kinematics skeleton for the demo and tests
 src/lib/ergo/       analysis layer (pure TypeScript, unit-tested)
   measures.ts         joint angles and distances with per-angle reliability
@@ -44,6 +49,7 @@ src/lib/ergo/       analysis layer (pure TypeScript, unit-tested)
   analyze.ts          session orchestration and multi-view fusion
 src/lib/export/     PDF (jsPDF), Word (docx), CSV, report images
 src/app/            pages: / · /live · /analyze · /sync · /methods
+server/sam3d_body/  SAM 3D Body GPU server (Python, Docker)
 ```
 
 The `/methods` page documents each algorithm, the confidence model, the pose import format for server-tier models (RTMW, Sapiens, MotionBERT, Pose2Sim, SMPL-X), the validation plan and known limitations.
@@ -52,6 +58,6 @@ The `/methods` page documents each algorithm, the confidence model, the pose imp
 
 Implemented: single and multi-camera (2–4 views, clap/flash sync, confidence-weighted angle fusion), live mode with neutral-posture calibration and coaching beeps, all analysis modules listed above, reports and exports, privacy controls.
 
-Not in the browser build (by design): GPU server models (Sapiens, SMPL-X fitting, WHAM/GVHMR lifting), calibrated ChArUco multi-view triangulation, learned action recognition, and hand-object detection by a vision model. Their outputs can be imported through the pose file format and then use all the same analysis modules. MediaPipe Pose is Apache-2.0; check licences of any non-commercial server-tier models before company use.
+Not in the browser build (by design): other GPU server models (Sapiens, SMPL-X fitting, WHAM/GVHMR lifting), calibrated ChArUco multi-view triangulation, learned action recognition, and hand-object detection by a vision model. Their outputs can be imported through the pose file format and then use all the same analysis modules. MediaPipe Pose is Apache-2.0; check licences of any non-commercial server-tier models before company use.
 
 ErgoCapture is a screening tool. Results should be reviewed by a qualified ergonomist.
