@@ -53,7 +53,7 @@ type P = [number, number, number, number];
  * ("mhr70", see sam_3d_body/metadata/mhr70.py). Fingers give real knuckle
  * positions, so wrist angles are far better than from coarse landmarks.
  */
-const MHR70_TO_BP: Record<number, number> = {
+export const MHR70_TO_BP: Record<number, number> = {
   0: KP.nose,
   1: KP.leftEye,
   2: KP.rightEye,
@@ -182,7 +182,7 @@ function completeSkeleton(bp: (P | null)[], extra?: { head?: P; neck?: P; nose?:
   });
 }
 
-function mapFrame(
+export function mapFrame(
   fmt: PoseFormat,
   pts: number[][] | null | undefined,
   k: number,

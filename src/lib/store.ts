@@ -5,6 +5,7 @@ import type { SessionAnalysis } from "./ergo/analyze";
 import type { Calibration } from "./ergo/measures";
 import { DEFAULT_SETTINGS, type TaskSettings } from "./ergo/settings";
 import type { ModelVariant } from "./pose/detector";
+import type { EngineId } from "./pose/engines";
 import type { PoseTrack } from "./pose/types";
 import type { ProcessedView } from "./pose/videoProcessor";
 
@@ -35,7 +36,7 @@ export interface Privacy {
   skeletonOnly: boolean;
 }
 
-export type PoseEngine = "mediapipe" | "sam3d";
+export type PoseEngine = EngineId;
 
 export interface ProcessOptions {
   fps: number;
@@ -70,7 +71,7 @@ interface State {
 }
 
 const SETTINGS_KEY = "ergocapture.settings.v1";
-const PROCESS_KEY = "ergocapture.engine.v1";
+const PROCESS_KEY = "ergocapture.engine.v2";
 
 function loadSettings(): TaskSettings {
   try {
@@ -85,7 +86,7 @@ export const useStore = create<State>((set, get) => ({
   views: [],
   settings: DEFAULT_SETTINGS,
   calib: {},
-  process: { fps: 10, variant: "full", maxPersons: 2, engine: "mediapipe", endpoint: "", token: "" },
+  process: { fps: 10, variant: "full", maxPersons: 2, engine: "rtmw", endpoint: "", token: "" },
   privacy: { blurFaces: true, skeletonOnly: false },
   analysis: null,
   title: "Workstation assessment",

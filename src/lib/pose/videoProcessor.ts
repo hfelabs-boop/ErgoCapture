@@ -1,12 +1,18 @@
 "use client";
 
-import { PoseDetector, type ModelVariant } from "./detector";
+import type { ModelVariant } from "./detector";
+import { createPoseEngine, type EngineId } from "./engines";
 import { PoseTracker } from "./tracker";
 import type { PoseFrame, PoseTrack } from "./types";
 
 export interface ProcessOptions {
   fps: number;
+  engine: Exclude<EngineId, "sam3d">;
   variant: ModelVariant;
+  /** Worker stature in metres (helps engines that need a metric scale) */
+  statureM?: number;
+  /** Status messages while models load */
+  onStatus?: (message: string) => void;
   maxPersons: number;
   /** Seconds to add to this view's timeline (from camera sync) */
   offsetSec: number;
@@ -62,7 +68,14 @@ export async function loadVideo(url: string): Promise<HTMLVideoElement> {
  */
 export async function processVideo(url: string, viewId: string, label: string, opts: ProcessOptions): Promise<ProcessedView> {
   const video = await loadVideo(url);
-  const detector = await PoseDetector.create({ variant: opts.variant, numPoses: opts.maxPersons, mode: "VIDEO" });
+  const engine = await createPoseEngine(opts.engine, {
+    numPoses: opts.maxPersons,
+    variant: opts.variant,
+    statureM: opts.statureM,
+    mode: "VIDEO",
+    onProgress: opts.onStatus,
+  });
+  opts.onStatus?.("");
   const tracker = new PoseTracker();
   const duration = video.duration;
   const n = Math.max(1, Math.floor(duration * opts.fps));
@@ -73,7 +86,7 @@ export async function processVideo(url: string, viewId: string, label: string, o
       if (opts.signal?.aborted) throw new DOMException("Aborted", "AbortError");
       const t = i / opts.fps;
       await seek(video, Math.min(t, duration - 0.001));
-      const dets = detector.detect(video, Math.round(t * 1000) + 1);
+      const dets = await engine.detect(video, Math.round(t * 1000) + 1);
       const ids = tracker.update(dets, t);
       times.push(t);
       dets.forEach((d, k) => {
@@ -87,7 +100,7 @@ export async function processVideo(url: string, viewId: string, label: string, o
       if (i % 4 === 0) await new Promise((r) => setTimeout(r, 0));
     }
   } finally {
-    detector.close();
+    engine.close();
   }
   // Densify each person's track onto the full timeline (null where absent).
   const tracks: PoseTrack[] = [...byPerson.entries()]
@@ -102,6 +115,8 @@ export async function processVideo(url: string, viewId: string, label: string, o
         width: video.videoWidth,
         height: video.videoHeight,
         frames,
+        source: engine.info.source,
+        detailedHands: engine.info.detailedHands,
       };
     })
     .sort((a, b) => b.frames.filter((f) => f.world).length - a.frames.filter((f) => f.world).length);

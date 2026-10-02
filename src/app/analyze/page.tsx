@@ -6,6 +6,7 @@ import { Button, Card, Field, NumberInput, Progress, Select, Toggle } from "@/co
 import { analyzeSession } from "@/lib/ergo/analyze";
 import { parsePoseJson } from "@/lib/pose/importExport";
 import { demoTrack } from "@/lib/pose/synthetic";
+import { ENGINES, type EngineId } from "@/lib/pose/engines";
 import { checkServer, processRemote } from "@/lib/pose/remoteProcessor";
 import { processVideo } from "@/lib/pose/videoProcessor";
 import { hydrateSettings, newId, selectedTracks, useStore, type ViewSource } from "@/lib/store";
@@ -125,7 +126,10 @@ function Analyze() {
                 })
               : await processVideo(v.url!, v.id, v.label, {
                   fps: s.process.fps,
+                  engine: s.process.engine,
                   variant: s.process.variant,
+                  statureM: s.settings.subjectHeightCm > 0 ? s.settings.subjectHeightCm / 100 : undefined,
+                  onStatus: (m) => s.updateView(v.id, { phase: m || undefined }),
                   maxPersons: s.process.maxPersons,
                   offsetSec: v.offsetSec,
                   signal: abort.current.signal,
@@ -230,18 +234,10 @@ function Analyze() {
             <Field label="Sampling rate" hint="Frames analysed per second of video">
               <Select value={s.process.fps} onChange={(fps) => s.setProcess({ fps })} options={[5, 10, 15, 30].map((f) => ({ value: f, label: `${f} fps` }))} />
             </Field>
-            <Field label="Pose engine">
-              <Select
-                value={s.process.engine}
-                onChange={(engine) => s.setProcess({ engine })}
-                options={[
-                  { value: "mediapipe", label: "On-device: MediaPipe (private, any device)" },
-                  { value: "sam3d", label: "SAM 3D Body (your GPU server, most accurate)" },
-                ]}
-              />
-            </Field>
-            {s.process.engine === "mediapipe" ? (
+            <EnginePicker />
+            {s.process.engine !== "sam3d" ? (
               <>
+                {s.process.engine === "mediapipe" && (
                 <Field label="Pose model" hint="Heavy is most accurate and slowest">
                   <Select
                     value={s.process.variant}
@@ -253,6 +249,7 @@ function Analyze() {
                     ]}
                   />
                 </Field>
+                )}
                 <Field label="People to track">
                   <Select value={s.process.maxPersons} onChange={(maxPersons) => s.setProcess({ maxPersons })} options={[1, 2, 3, 4].map((n) => ({ value: n, label: String(n) }))} />
                 </Field>
@@ -309,7 +306,13 @@ function ViewRow({ v, index }: { v: ViewSource; index: number }) {
       {v.status === "processing" && (
         <div className="mt-2">
           <Progress value={v.progress} />
-          <div className="mt-1 text-xs text-slate-500">{v.phase ? `${v.phase}… ${Math.round(v.progress * 100)}%` : v.progress === 0 ? "Loading pose model…" : `Estimating pose… ${Math.round(v.progress * 100)}%`}</div>
+          <div className="mt-1 text-xs text-slate-500">{v.phase
+                ? v.phase.endsWith("…")
+                  ? v.phase
+                  : `${v.phase}… ${Math.round(v.progress * 100)}%`
+                : v.progress === 0
+                  ? "Loading pose model…"
+                  : `Estimating pose… ${Math.round(v.progress * 100)}%`}</div>
         </div>
       )}
       {v.status === "error" && <p className="mt-2 text-sm text-red-600">{v.error}</p>}
@@ -365,6 +368,29 @@ function Sam3dServerFields() {
       <p className="text-[11px] leading-snug text-slate-500">
         Videos are uploaded to this server only, deleted after processing, and results come back as 3D keypoints. Use on-device processing when video must not leave the device.
       </p>
+    </div>
+  );
+}
+
+function EnginePicker() {
+  const engine = useStore((x) => x.process.engine);
+  const setProcess = useStore((x) => x.setProcess);
+  const info = ENGINES[engine];
+  return (
+    <div className="space-y-2">
+      <Field label="Pose engine">
+        <Select<EngineId>
+          value={engine}
+          onChange={(e) => setProcess({ engine: e })}
+          options={(Object.keys(ENGINES) as EngineId[]).map((id) => ({ value: id, label: ENGINES[id].label }))}
+        />
+      </Field>
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs text-slate-600">
+        <p>{info.summary}</p>
+        <p className="mt-1 text-slate-500">
+          {info.where === "browser" ? "Runs in this browser" : "Runs on your server"} · {info.download} · licence: {info.licence}
+        </p>
+      </div>
     </div>
   );
 }

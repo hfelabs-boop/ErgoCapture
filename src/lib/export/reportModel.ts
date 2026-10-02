@@ -278,7 +278,7 @@ export function buildSections(a: SessionAnalysis): Section[] {
 
 export function methodsText(): string[] {
   return [
-    "Pose: MediaPipe Pose Landmarker (33 keypoints, 2D + metric 3D), smoothed with a bidirectional One-Euro filter; gaps ≤ 0.6 s are interpolated. Multi-camera sessions are time-aligned and fused per joint angle, weighted by confidence.",
+    "Pose: the engine named per view under Data quality (RTMW3D-X whole-body by default; MediaPipe Pose, InstantHMR or SAM 3D Body optional), mapped to a common 33-point 2D + metric 3D skeleton, smoothed with a bidirectional One-Euro filter; gaps ≤ 0.6 s are interpolated. Multi-camera sessions are time-aligned and fused per joint angle, weighted by confidence.",
     "RULA: McAtamney & Corlett (1993). REBA: Hignett & McAtamney (2000). OWAS: Karhu et al. (1977). Revised NIOSH Lifting Equation: Waters et al. (1993). Strain Index: Moore & Garg (1995). OCRA checklist: Colombini et al. (2002), screening-level implementation. ISO 11226:2000 and EN 1005-4:2005 static and movement limits, with linearised holding-time curves.",
     "Values not observable from video (load weight, coupling quality, exertion intensity, recovery periods) are taken from the task settings. Forearm rotation (RULA wrist twist) is assumed mid-range.",
     "This is a screening tool. Results should be reviewed by a qualified ergonomist before decisions are made.",

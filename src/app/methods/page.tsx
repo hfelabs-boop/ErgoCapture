@@ -62,10 +62,11 @@ export default function Methods() {
       <S id="pipeline" title="2. Processing pipeline">
         <ol className="list-decimal space-y-1.5 pl-5">
           <li>
-            <b>Detection and tracking.</b> MediaPipe Pose Landmarker detects up to 4 people per frame; an IoU tracker keeps a stable identity for each worker.
+            <b>Detection and tracking.</b> Up to 4 people per frame are detected; an IoU tracker keeps a stable identity for each worker.
           </li>
           <li>
-            <b>2D + 3D pose.</b> 33 keypoints (body, hands, feet, face) in image coordinates and metric, hip-centred 3D world coordinates from the same network.
+            <b>2D + 3D pose</b>, from the engine chosen on the Analyze or Live page (table below). Every engine&apos;s output is mapped onto one 33-point layout in image
+            coordinates and metric, hip-centred 3D, so all analysis modules work the same whichever engine produced the data.
           </li>
           <li>
             <b>Multi-camera fusion.</b> Views are time-aligned and every joint angle is fused by confidence-weighted averaging; disagreement between views lowers confidence.
@@ -81,6 +82,42 @@ export default function Methods() {
             <b>Confidence.</b> Every angle carries a reliability (below).
           </li>
         </ol>
+      </S>
+
+      <S id="engines" title="2b. Pose engines">
+        <T
+          head={["Engine", "Runs", "Keypoints", "Download", "Licence", "Best for"]}
+          rows={[
+            [
+              <b key="r">RTMW3D-X (default)</b>,
+              "Browser (WebGPU or multi-threaded WebAssembly)",
+              "133 whole-body: body, feet, face, all finger joints; per-keypoint scores",
+              "≈ 370 MB once, then cached",
+              "Apache-2.0",
+              "Recorded video on a laptop/desktop; reliable wrist angles",
+            ],
+            ["MediaPipe Pose", "Browser (GPU)", "33, coarse hands", "6–30 MB", "Apache-2.0", "Live coaching on phones; fastest"],
+            [
+              "SAM 3D Body Lite (InstantHMR)",
+              "Browser",
+              "70 (MHR mesh fit), no per-keypoint scores",
+              "≈ 80 MB",
+              "SAM License (Meta)",
+              "Occlusion and unusual postures; community distillation, not independently validated",
+            ],
+            ["SAM 3D Body", "Your GPU server", "70 (MHR mesh fit)", "server side", "SAM License (Meta)", "Most robust; video is uploaded to your server"],
+          ]}
+        />
+        <p>
+          <b>RTMW metric scale.</b> RTMW3D returns x and y in image pixels and z as metric depth. The app finds the metres-per-pixel factor that makes the visible limb
+          and trunk segments match a body of the worker&apos;s height (entered in task settings, default 1.70 m), then builds metric 3D coordinates. Entering the worker&apos;s
+          height therefore improves RTMW&apos;s angles as well as all distances.
+        </p>
+        <p>
+          <b>Confidence per engine.</b> RTMW scores are rescaled onto a visibility-like 0–1 range; MediaPipe visibilities are used as is; mesh-fitting engines (InstantHMR,
+          SAM 3D Body) give 0.85 to keypoints inside the frame and 0.4 outside, because they report no per-keypoint score. Engines with finger joints raise wrist-angle
+          reliability from 0.6 to 0.9. Person detection for the browser engines uses EfficientDet-Lite0 (Apache-2.0); the AGPL-licensed YOLO detectors are not used.
+        </p>
       </S>
 
       <S id="modules" title="3. Analysis modules">
@@ -120,7 +157,8 @@ export default function Methods() {
       <S id="tiers" title="5. Deployment tiers and privacy">
         <ul className="list-disc space-y-1 pl-5">
           <li>
-            <b>On-device (this web app).</b> MediaPipe runs in the browser (GPU when available). Nothing is uploaded; works on phones, laptops and desktops.
+            <b>On-device (this web app).</b> RTMW, MediaPipe and InstantHMR run in the browser (WebGPU when available, otherwise multi-threaded WebAssembly). Nothing is
+            uploaded; models are downloaded once and cached by the browser.
           </li>
           <li>
             <b>Workstation / server tier: SAM 3D Body.</b> Meta&apos;s SAM 3D Body recovers a full 3D body mesh (Momentum Human Rig) with all finger joints from each frame. It
@@ -181,7 +219,7 @@ export default function Methods() {
           <li>Activity segmentation is rule-based. Learned action recognition belongs to the server tier.</li>
           <li>Holding-time limits in the ISO 11226 module are linear approximations of the standard&apos;s curves; OCRA is implemented as a screening checklist.</li>
           <li>
-            Licensing: MediaPipe Pose (Apache-2.0) is used on-device and allows commercial use. SAM 3D Body is under Meta&apos;s SAM License, which permits commercial use
+            Licensing: RTMW3D-X and MediaPipe Pose (both Apache-2.0) run on-device and allow commercial use; InstantHMR inherits the SAM License from SAM 3D Body. SAM 3D Body is under Meta&apos;s SAM License, which permits commercial use
             subject to its terms; its checkpoints are gated on Hugging Face. Some other server-tier models (Sapiens, SMPL-X, several 3D lifters) carry non-commercial
             licences; check before deploying them.
           </li>

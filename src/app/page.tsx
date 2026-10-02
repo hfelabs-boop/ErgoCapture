@@ -88,7 +88,7 @@ export default function Home() {
               best for a single camera.
             </li>
             <li>
-              <b className="text-slate-800">2. Pose.</b> Every person is detected and tracked; 33 body, hand and foot keypoints are estimated in 2D and metric 3D, then smoothed and
+              <b className="text-slate-800">2. Pose.</b> Every person is detected and tracked; whole-body keypoints including finger joints (RTMW by default, or MediaPipe / SAM 3D Body) are estimated in 2D and metric 3D, then smoothed and
               gap-filled.
             </li>
             <li>

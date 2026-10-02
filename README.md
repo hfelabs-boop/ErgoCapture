@@ -1,6 +1,6 @@
 # ErgoCapture
 
-Camera-based ergonomic posture analysis that runs in the browser. Record a worker with a phone, webcam or network camera (or upload 1–4 synchronised videos). ErgoCapture estimates 2D and 3D body posture on-device, then scores it on standard ergonomic methods, with a confidence level for every score.
+Camera-based ergonomic posture analysis that runs in the browser. Record a worker with a phone, webcam or network camera (or upload 1–4 synchronised videos). ErgoCapture estimates 2D and 3D whole-body posture on-device (RTMW by default, with MediaPipe and SAM 3D Body as alternatives), then scores it on standard ergonomic methods, with a confidence level for every score.
 
 **Modules:** RULA · REBA · OWAS · Revised NIOSH Lifting Equation · Strain Index · OCRA checklist · ISO 11226 / EN 1005-4 static postures · reach zones · anthropometric fit. **Supporting analysis:** repetition counting, activity segmentation, time-in-posture, static-hold detection, hand-load heuristic.
 
@@ -25,6 +25,17 @@ This is a standard Next.js app with no server code or environment variables. Imp
 
 The pose model (`pose_landmarker_{lite,full,heavy}.task`) is fetched from Google's CDN and the WASM runtime from jsDelivr at runtime. For offline or on-premise deployment, mirror those files and change `WASM_BASE` / `MODEL_URL` in `src/lib/pose/detector.ts`.
 
+## Pose engines
+
+| Engine | Runs | Notes |
+|---|---|---|
+| **RTMW3D-X** (default) | browser | 133 whole-body keypoints incl. finger joints; ≈ 370 MB model cached after first use; Apache-2.0 |
+| MediaPipe Pose | browser | fastest, best for live use on phones; coarse hands; Apache-2.0 |
+| SAM 3D Body Lite (InstantHMR) | browser | ≈ 80 MB distillation of SAM 3D Body; SAM License |
+| SAM 3D Body | your GPU server | see below; SAM License |
+
+Browser engines come from [rtmlib-ts](https://github.com/GOH23/rtmlib-ts) on ONNX Runtime Web (WebGPU, else multi-threaded WebAssembly; the site sends COOP/COEP headers for threading). Person detection uses EfficientDet-Lite0 (Apache-2.0) rather than the AGPL YOLO models. `scripts/patch-rtmlib.mjs` pins the MediaPipe WASM version rtmlib-ts loads, and `package.json` pins `onnxruntime-web` to the version whose WASM it fetches.
+
 ## SAM 3D Body (GPU server tier)
 
 For the most accurate assessments, `server/sam3d_body/` runs Meta's [SAM 3D Body](https://github.com/facebookresearch/sam-3d-body) on a CUDA GPU (Docker image, HTTP job server and CLI). Choose **SAM 3D Body** as the pose engine on the Analyze page and enter your server URL, or convert videos with the CLI and open the `.pose.json` files. It returns a full-body mesh fit with finger joints (`mhr70` keypoints), which improves robustness to occlusion and makes wrist angles reliable. See [server/sam3d_body/README.md](server/sam3d_body/README.md). Vercel only hosts the web app; the GPU server runs on your own hardware or cloud GPU.
@@ -33,6 +44,7 @@ For the most accurate assessments, `server/sam3d_body/` runs Meta's [SAM 3D Body
 
 ```
 src/lib/pose/       capture and pose layer
+  engines/            pose engines behind one interface: RTMW3D-X (default), MediaPipe, InstantHMR
   detector.ts         MediaPipe Pose Landmarker wrapper (GPU, CPU fallback)
   videoProcessor.ts   offline frame-stepping of recorded video
   tracker.ts          multi-person IoU tracker (stable worker IDs)

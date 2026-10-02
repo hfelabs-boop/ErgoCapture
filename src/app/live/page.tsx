@@ -10,7 +10,8 @@ import { scoreReba } from "@/lib/ergo/reba";
 import { RISK_COLORS, type ScoredFrame } from "@/lib/ergo/risk";
 import { scoreRula } from "@/lib/ergo/rula";
 import { NEUTRAL_CONTEXT } from "@/lib/ergo/settings";
-import { PoseDetector, type ModelVariant } from "@/lib/pose/detector";
+import type { ModelVariant } from "@/lib/pose/detector";
+import { BROWSER_ENGINES, createPoseEngine, ENGINES, type EngineId, type PoseEngine } from "@/lib/pose/engines";
 import { SkeletonSmoother } from "@/lib/pose/filters";
 import type { PoseFrame, PoseTrack } from "@/lib/pose/types";
 import { hydrateSettings, useStore } from "@/lib/store";
@@ -31,6 +32,8 @@ export default function LivePage() {
   const [deviceId, setDeviceId] = useState<string>("");
   const [streamUrl, setStreamUrl] = useState("");
   const [variant, setVariant] = useState<ModelVariant>("lite");
+  const [engineId, setEngineId] = useState<Exclude<EngineId, "sam3d">>("rtmw");
+  const [loadMsg, setLoadMsg] = useState("");
   const [state, setState] = useState<"idle" | "loading" | "running">("idle");
   const [recording, setRecording] = useState(false);
   const [calibrating, setCalibrating] = useState(false);
@@ -44,7 +47,8 @@ export default function LivePage() {
   const calib = useStore((s) => s.calib);
 
   const rt = useRef({
-    detector: null as PoseDetector | null,
+    detector: null as PoseEngine | null,
+    busy: false,
     stream: null as MediaStream | null,
     raf: 0,
     smoother: new SkeletonSmoother(1.0, 0.03),
@@ -84,15 +88,27 @@ export default function LivePage() {
     }
   };
 
-  const loop = useCallback(() => {
+  const loop = useCallback(async () => {
     const r = rt.current;
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!r.detector || !video || !canvas) return;
+    // Slower engines (RTMW) take longer than a display frame: never overlap calls.
+    if (r.busy) {
+      r.raf = requestAnimationFrame(loop);
+      return;
+    }
     if (video.readyState >= 2) {
+      r.busy = true;
       const now = performance.now();
       const t = (now - r.t0) / 1000;
-      const dets = r.detector.detect(video, now);
+      let dets: Awaited<ReturnType<PoseEngine["detect"]>> = [];
+      try {
+        dets = await r.detector.detect(video, now);
+      } finally {
+        r.busy = false;
+      }
+      if (!r.detector) return;
       const det = dets[0];
       const frame: PoseFrame = det
         ? { t, image: r.smoother.smooth(det.image, t, "i"), world: r.smoother.smooth(det.world, t, "w") }
@@ -155,7 +171,15 @@ export default function LivePage() {
         navigator.mediaDevices.enumerateDevices().then((d) => setDevices(d.filter((x) => x.kind === "videoinput")));
       }
       await video.play();
-      rt.current.detector = await PoseDetector.create({ variant, numPoses: 1, mode: "VIDEO" });
+      const st = useStore.getState().settings;
+      rt.current.detector = await createPoseEngine(engineId, {
+        numPoses: 1,
+        variant,
+        mode: "VIDEO",
+        statureM: st.subjectHeightCm > 0 ? st.subjectHeightCm / 100 : undefined,
+        onProgress: setLoadMsg,
+      });
+      setLoadMsg("");
       rt.current.t0 = performance.now();
       rt.current.smoother.reset();
       setState("running");
@@ -247,7 +271,18 @@ export default function LivePage() {
       grid.push(Math.abs(f.t - t) < 0.2 ? { ...f, t } : { t, image: null, world: null });
     }
     const video = videoRef.current!;
-    const track: PoseTrack = { viewId: "live", viewLabel: "Live camera", personId: 1, fps, width: video.videoWidth || 1280, height: video.videoHeight || 720, frames: grid };
+    const info = ENGINES[engineId];
+    const track: PoseTrack = {
+      viewId: "live",
+      viewLabel: "Live camera",
+      personId: 1,
+      fps,
+      width: video.videoWidth || 1280,
+      height: video.videoHeight || 720,
+      frames: grid,
+      source: info.source,
+      detailedHands: info.detailedHands,
+    };
     stop();
     const st = useStore.getState();
     st.reset();
@@ -274,7 +309,7 @@ export default function LivePage() {
             <video ref={videoRef} playsInline muted className="hidden" />
             {state !== "running" && (
               <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-400">
-                {state === "loading" ? "Loading camera and pose model…" : "Camera off"}
+                {state === "loading" ? loadMsg || "Loading camera and pose model…" : "Camera off"}
               </div>
             )}
             {recording && <div className="absolute top-3 right-3 flex items-center gap-1.5 rounded-full bg-red-600 px-2.5 py-1 text-xs font-semibold text-white">● REC</div>}
@@ -350,17 +385,26 @@ export default function LivePage() {
               <Field label="Or network stream URL" hint="IP camera stream playable in the browser (MP4/HLS/WebM) with CORS enabled">
                 <input className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm" value={streamUrl} onChange={(e) => setStreamUrl(e.target.value)} placeholder="https://camera.local/stream.m3u8" />
               </Field>
-              <Field label="Model">
-                <Select
-                  value={variant}
-                  onChange={setVariant}
-                  options={[
-                    { value: "lite", label: "Lite (phones, fastest)" },
-                    { value: "full", label: "Full" },
-                    { value: "heavy", label: "Heavy (desktop GPU)" },
-                  ]}
+              <Field label="Pose engine" hint={ENGINES[engineId].summary}>
+                <Select<Exclude<EngineId, "sam3d">>
+                  value={engineId}
+                  onChange={setEngineId}
+                  options={BROWSER_ENGINES.filter((id): id is Exclude<EngineId, "sam3d"> => id !== "sam3d").map((id) => ({ value: id, label: ENGINES[id].label }))}
                 />
               </Field>
+              {engineId === "mediapipe" && (
+                <Field label="MediaPipe model">
+                  <Select
+                    value={variant}
+                    onChange={setVariant}
+                    options={[
+                      { value: "lite", label: "Lite (phones, fastest)" },
+                      { value: "full", label: "Full" },
+                      { value: "heavy", label: "Heavy (desktop GPU)" },
+                    ]}
+                  />
+                </Field>
+              )}
               <Toggle checked={privacy.blurFaces} onChange={(v) => setPrivacy({ blurFaces: v })} label="Blur faces" />
               <Toggle checked={privacy.skeletonOnly} onChange={(v) => setPrivacy({ skeletonOnly: v })} label="Skeleton only (no video stored)" />
               <Toggle checked={alerts} onChange={setAlerts} label="Beep when high risk lasts > 3 s" />
