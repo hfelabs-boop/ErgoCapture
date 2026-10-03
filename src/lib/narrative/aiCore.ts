@@ -16,6 +16,8 @@ export const AI_MODELS = {
 
 export interface CoreOptions {
   device: AiDevice;
+  /** Use the production writer even on CPU (testing) */
+  fullWriter?: boolean;
   onProgress?: (message: string) => void;
 }
 
@@ -156,7 +158,7 @@ export function parseSections(md: string): NarrativeSection[] {
 
 export async function writeNarrative(facts: string, frameNotes: Array<{ t: number; text: string }>, o: CoreOptions) {
   const tf = await import("@huggingface/transformers");
-  const m = o.device === "webgpu" ? AI_MODELS.text : AI_MODELS.textCpu;
+  const m = o.device === "webgpu" || o.fullWriter ? AI_MODELS.text : AI_MODELS.textCpu;
   const onp = progressReporter("writing model", o.onProgress);
   const generator = await tf.pipeline("text-generation", m.id, {
     device: o.device,
@@ -174,7 +176,7 @@ export async function writeNarrative(facts: string, frameNotes: Array<{ t: numbe
     },
     {
       role: "user",
-      content: `Facts from the automated assessment:\n\n${facts}${seen}\n\nWrite the report narrative with these sections, each starting with a markdown heading (##): Overview, What the worker does, Main risks, Recommendations, Confidence. Use short paragraphs. Keep every number exactly as given. /no_think`,
+      content: `Facts from the automated assessment:\n\n${facts}${seen}\n\nWrite the descriptive part of the report with exactly these four sections, each starting with a markdown heading (##): Overview, What the worker does, Main risks, Confidence. Weave what the camera shows into "What the worker does". Do not write recommendations and do not add other sections. Use short paragraphs. Keep every number and its meaning exactly as given. /no_think`,
     },
   ];
   o.onProgress?.("Writing the narrative…");
@@ -183,7 +185,9 @@ export async function writeNarrative(facts: string, frameNotes: Array<{ t: numbe
       generated_text: Array<{ role: string; content: string }>;
     }>;
     const reply = result[0].generated_text.at(-1)?.content ?? "";
-    const { sections, removed } = guardNumbers(parseSections(reply), `${facts}${seen}`);
+    // Recommendations always come from the rule-based engine, never from the model.
+    const written = parseSections(reply).filter((s) => !/recommend|camera shows|key moments/i.test(s.heading));
+    const { sections, removed } = guardNumbers(written, `${facts}${seen}`);
     return { sections, removed, model: m.name };
   } finally {
     await generator.dispose();

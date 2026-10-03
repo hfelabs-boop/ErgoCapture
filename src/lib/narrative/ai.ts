@@ -28,7 +28,8 @@ export interface AiAvailability {
 export async function aiAvailability(): Promise<AiAvailability> {
   if (typeof window === "undefined") return { ok: false, reason: "Not available" };
   // CPU mode for automated testing only.
-  if (new URLSearchParams(window.location.search).get("ai") === "wasm") return { ok: true, device: "wasm" };
+  const testMode = new URLSearchParams(window.location.search).get("ai");
+  if (testMode === "wasm" || testMode === "wasm-full") return { ok: true, device: "wasm" };
   if (isConstrainedDevice()) return { ok: false, reason: "The AI narrative is turned off on phones and tablets (≈ 1.8 GB of models). Use a laptop or desktop." };
   try {
     const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
@@ -80,7 +81,8 @@ export async function generateAiNarrative(
         else if (m.type === "error") reject(new Error(m.message));
         else resolve(m);
       };
-      worker.postMessage({ device: o.device, facts: factSheet(template), frames: inputs }, inputs.map((f) => f.data.buffer));
+      const fullWriter = new URLSearchParams(window.location.search).get("ai") === "wasm-full";
+      worker.postMessage({ device: o.device, facts: factSheet(template), frames: inputs, fullWriter }, inputs.map((f) => f.data.buffer));
     });
     try {
       window.localStorage.setItem(DOWNLOADED_KEY, "1");
@@ -92,7 +94,8 @@ export async function generateAiNarrative(
       title: template.title,
       source: "ai",
       model: res.frameNotes.length ? `${res.model} + ${AI_MODELS.vision.name}` : res.model,
-      sections: res.sections,
+      // Descriptive sections from the model; recommendations verbatim from the rule-based engine.
+      sections: [...res.sections, ...template.sections.filter((s) => s.heading === "Recommendations")],
       frameNotes: res.frameNotes,
       removedSentences: res.removed,
     };
