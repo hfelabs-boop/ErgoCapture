@@ -1,5 +1,6 @@
 "use client";
 
+import { useDownloadGate } from "@/components/DownloadGate";
 import { Results } from "@/components/Results";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { Button, Card, Field, NumberInput, Progress, Select, Toggle } from "@/components/ui";
@@ -28,6 +29,7 @@ function Analyze() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
+  const { gate, dialog } = useDownloadGate();
 
   useEffect(() => {
     hydrateSettings();
@@ -103,6 +105,17 @@ function Analyze() {
       setError("Enter the SAM 3D Body server URL, or switch the pose engine to on-device.");
       return;
     }
+    // Ask before a large first-time model download (only if videos still need processing).
+    let engine = s.process.engine;
+    const pending = useStore.getState().views.some((v) => v.kind === "video" && !(v.status === "done" && v.processed));
+    if (pending && engine !== "sam3d") {
+      const chosen = await gate(engine);
+      if (!chosen) return;
+      if (chosen !== engine) {
+        engine = chosen;
+        s.setProcess({ engine });
+      }
+    }
     setRunning(true);
     abort.current = new AbortController();
     try {
@@ -111,7 +124,7 @@ function Analyze() {
         s.updateView(v.id, { status: "processing", progress: 0, error: undefined, phase: undefined });
         try {
           const processed =
-            s.process.engine === "sam3d"
+            engine === "sam3d"
               ? await processRemote(v.file!, v.id, v.label, {
                   endpoint: s.process.endpoint,
                   token: s.process.token || undefined,
@@ -126,7 +139,7 @@ function Analyze() {
                 })
               : await processVideo(v.url!, v.id, v.label, {
                   fps: s.process.fps,
-                  engine: s.process.engine,
+                  engine,
                   variant: s.process.variant,
                   statureM: s.settings.subjectHeightCm > 0 ? s.settings.subjectHeightCm / 100 : undefined,
                   onStatus: (m) => s.updateView(v.id, { phase: m || undefined }),
@@ -173,6 +186,7 @@ function Analyze() {
   const videos = s.views.filter((v) => v.kind === "video");
   return (
     <div className="space-y-4">
+      {dialog}
       <div>
         <h1 className="text-2xl font-semibold">Analyze recordings</h1>
         <p className="text-sm text-slate-500">
@@ -307,7 +321,7 @@ function ViewRow({ v, index }: { v: ViewSource; index: number }) {
         <div className="mt-2">
           <Progress value={v.progress} />
           <div className="mt-1 text-xs text-slate-500">{v.phase
-                ? v.phase.endsWith("…")
+                ? v.phase.endsWith("…") || v.phase.includes("%")
                   ? v.phase
                   : `${v.phase}… ${Math.round(v.progress * 100)}%`
                 : v.progress === 0

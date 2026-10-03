@@ -5,7 +5,7 @@ import type { SessionAnalysis } from "./ergo/analyze";
 import type { Calibration } from "./ergo/measures";
 import { DEFAULT_SETTINGS, type TaskSettings } from "./ergo/settings";
 import type { ModelVariant } from "./pose/detector";
-import type { EngineId } from "./pose/engines";
+import { defaultEngine, type EngineId } from "./pose/engines";
 import type { PoseTrack } from "./pose/types";
 import type { ProcessedView } from "./pose/videoProcessor";
 
@@ -134,6 +134,8 @@ export function hydrateSettings() {
   } catch {
     /* storage unavailable */
   }
+  // No saved choice yet: pick by device (MediaPipe on phones, RTMW elsewhere).
+  if (!engine.engine) engine.engine = defaultEngine();
   useStore.setState((s) => ({ settings: loadSettings(), process: { ...s.process, ...engine } }));
 }
 

@@ -29,8 +29,8 @@ The pose model (`pose_landmarker_{lite,full,heavy}.task`) is fetched from Google
 
 | Engine | Runs | Notes |
 |---|---|---|
-| **RTMW3D-X** (default) | browser | 133 whole-body keypoints incl. finger joints; ≈ 370 MB model cached after first use; Apache-2.0 |
-| MediaPipe Pose | browser | fastest, best for live use on phones; coarse hands; Apache-2.0 |
+| **RTMW3D-X** (default on laptops/desktops) | browser | 133 whole-body keypoints incl. finger joints; ≈ 370 MB, downloaded once after the user confirms, then stored in the browser; Apache-2.0 |
+| MediaPipe Pose (default on phones / slow connections) | browser | fastest, best for live use on phones; coarse hands; Apache-2.0 |
 | SAM 3D Body Lite (InstantHMR) | browser | ≈ 80 MB distillation of SAM 3D Body; SAM License |
 | SAM 3D Body | your GPU server | see below; SAM License |
 

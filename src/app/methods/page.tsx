@@ -109,6 +109,11 @@ export default function Methods() {
           ]}
         />
         <p>
+          <b>Choosing and downloading.</b> Laptops and desktops start with RTMW; phones, tablets and slow or data-saver connections start with MediaPipe. Before RTMW&apos;s
+          one-time ≈ 370 MB download the app asks first (with the option to use MediaPipe instead), shows download progress, and stores the model in the browser so later
+          runs start without downloading. A private window or a nearly full disk may prevent storing it; the dialog warns when that is likely.
+        </p>
+        <p>
           <b>RTMW metric scale.</b> RTMW3D returns x and y in image pixels and z as metric depth. The app finds the metres-per-pixel factor that makes the visible limb
           and trunk segments match a body of the worker&apos;s height (entered in task settings, default 1.70 m), then builds metric 3D coordinates. Entering the worker&apos;s
           height therefore improves RTMW&apos;s angles as well as all distances.

@@ -11,7 +11,8 @@ import { RISK_COLORS, type ScoredFrame } from "@/lib/ergo/risk";
 import { scoreRula } from "@/lib/ergo/rula";
 import { NEUTRAL_CONTEXT } from "@/lib/ergo/settings";
 import type { ModelVariant } from "@/lib/pose/detector";
-import { BROWSER_ENGINES, createPoseEngine, ENGINES, type EngineId, type PoseEngine } from "@/lib/pose/engines";
+import { useDownloadGate } from "@/components/DownloadGate";
+import { BROWSER_ENGINES, createPoseEngine, defaultEngine, ENGINES, type EngineId, type PoseEngine } from "@/lib/pose/engines";
 import { SkeletonSmoother } from "@/lib/pose/filters";
 import type { PoseFrame, PoseTrack } from "@/lib/pose/types";
 import { hydrateSettings, useStore } from "@/lib/store";
@@ -34,6 +35,7 @@ export default function LivePage() {
   const [variant, setVariant] = useState<ModelVariant>("lite");
   const [engineId, setEngineId] = useState<Exclude<EngineId, "sam3d">>("rtmw");
   const [loadMsg, setLoadMsg] = useState("");
+  const { gate, dialog } = useDownloadGate();
   const [state, setState] = useState<"idle" | "loading" | "running">("idle");
   const [recording, setRecording] = useState(false);
   const [calibrating, setCalibrating] = useState(false);
@@ -69,6 +71,7 @@ export default function LivePage() {
 
   useEffect(() => {
     hydrateSettings();
+    setEngineId(defaultEngine());
     navigator.mediaDevices?.enumerateDevices().then((d) => setDevices(d.filter((x) => x.kind === "videoinput")));
     return () => stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -154,6 +157,9 @@ export default function LivePage() {
 
   const start = async () => {
     setError(null);
+    const chosen = await gate(engineId);
+    if (!chosen || chosen === "sam3d") return;
+    if (chosen !== engineId) setEngineId(chosen);
     setState("loading");
     try {
       const video = videoRef.current!;
@@ -172,7 +178,7 @@ export default function LivePage() {
       }
       await video.play();
       const st = useStore.getState().settings;
-      rt.current.detector = await createPoseEngine(engineId, {
+      rt.current.detector = await createPoseEngine(chosen, {
         numPoses: 1,
         variant,
         mode: "VIDEO",
@@ -271,7 +277,7 @@ export default function LivePage() {
       grid.push(Math.abs(f.t - t) < 0.2 ? { ...f, t } : { t, image: null, world: null });
     }
     const video = videoRef.current!;
-    const info = ENGINES[engineId];
+    const info = rt.current.detector?.info ?? ENGINES[engineId];
     const track: PoseTrack = {
       viewId: "live",
       viewLabel: "Live camera",
@@ -295,6 +301,7 @@ export default function LivePage() {
 
   return (
     <div className="space-y-4">
+      {dialog}
       <div>
         <h1 className="text-2xl font-semibold">Live coaching</h1>
         <p className="text-sm text-slate-500">

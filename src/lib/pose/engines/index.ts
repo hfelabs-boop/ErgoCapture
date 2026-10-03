@@ -3,6 +3,7 @@
 import type { InstantHMR3DResult, Pose3DResult } from "rtmlib-ts";
 import type { Detection } from "../tracker";
 import { mapMhr70, mapRtmw } from "./mapping";
+import { canStore, isStored, modelObjectUrl } from "./modelStore";
 
 /**
  * Pose engines behind one interface. All run in the browser except
@@ -68,6 +69,58 @@ export const ENGINES: Record<EngineId, EngineInfo> = {
 
 export const BROWSER_ENGINES: EngineId[] = ["rtmw", "mediapipe", "instanthmr"];
 
+/** Model files the app loads; also the keys of the browser's model cache. */
+export const RTMW_MODEL_URL =
+  "https://huggingface.co/Soykaf/RTMW3D-x/resolve/main/onnx/rtmw3d-x_8xb64_cocktail14-384x288-b0a0eab7_20240626.onnx";
+export const INSTANTHMR_MODEL_URL = "https://huggingface.co/momolesang/InstantHMR/resolve/main/instanthmr.onnx";
+
+const BIG_MODELS: Partial<Record<EngineId, { url: string; mb: number }>> = {
+  rtmw: { url: RTMW_MODEL_URL, mb: 370 },
+  instanthmr: { url: INSTANTHMR_MODEL_URL, mb: 80 },
+};
+
+/** Size in MB still to download before this engine can run (0 when stored or small). */
+export async function pendingDownloadMb(id: EngineId): Promise<number> {
+  const m = BIG_MODELS[id];
+  if (!m) return 0;
+  try {
+    if (id === "rtmw") return (await isStored(m.url)) ? 0 : m.mb;
+    const { isModelCached } = await import("rtmlib-ts");
+    return (await isModelCached(m.url)) ? 0 : m.mb;
+  } catch {
+    return m.mb;
+  }
+}
+
+/** False when the browser has too little storage to keep the model (it would re-download each time). */
+export async function canKeepModel(id: EngineId): Promise<boolean> {
+  const m = BIG_MODELS[id];
+  return m ? canStore(m.mb * 1e6) : true;
+}
+
+interface NetworkInformationLike {
+  saveData?: boolean;
+  effectiveType?: string;
+  type?: string;
+}
+
+/** Phone/tablet, data-saver mode, or a slow or cellular connection. */
+export function isConstrainedDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const nav = navigator as Navigator & { userAgentData?: { mobile?: boolean }; connection?: NetworkInformationLike };
+  const c = nav.connection;
+  if (c?.saveData || c?.type === "cellular" || ["slow-2g", "2g", "3g"].includes(c?.effectiveType ?? "")) return true;
+  if (nav.userAgentData?.mobile) return true;
+  // iPadOS reports a desktop UA; touch points give it away.
+  if (/Android|iPhone|iPad|iPod|Mobile/i.test(nav.userAgent) || (nav.maxTouchPoints > 1 && /Macintosh/.test(nav.userAgent))) return true;
+  return false;
+}
+
+/** RTMW on laptops/desktops; MediaPipe on phones and constrained connections. */
+export function defaultEngine(): Exclude<EngineId, "sam3d"> {
+  return isConstrainedDevice() ? "mediapipe" : "rtmw";
+}
+
 export interface PoseEngine {
   info: EngineInfo;
   /** Backend actually used (gpu, webgpu, wasm…) */
@@ -104,14 +157,19 @@ function topN<T extends { bbox: { x1: number; y1: number; x2: number; y2: number
 
 async function rtmlibDetector(pose3dModel: "rtmw3d" | "instanthmr", onProgress?: (m: string) => void, only?: "wasm") {
   const { Pose3DDetector } = await import("rtmlib-ts");
+  // RTMW: we download and store the model ourselves (progress, persistence,
+  // no second download on fallback) and pass a local URL.
+  const poseModel =
+    pose3dModel === "rtmw3d"
+      ? await modelObjectUrl(RTMW_MODEL_URL, (f) => onProgress?.(`Downloading RTMW model… ${Math.round(f * 100)}% (≈ 370 MB, first use only)`))
+      : undefined;
   const stages: Record<string, string> = {
     "mp-init": "Loading person detector…",
-    "pose-load": pose3dModel === "rtmw3d" ? "Downloading RTMW model (≈ 370 MB, first use only)…" : "Downloading InstantHMR model (≈ 80 MB)…",
+    "pose-load": pose3dModel === "rtmw3d" ? "Preparing RTMW model…" : "Downloading InstantHMR model (≈ 80 MB)…",
     ready: "Model ready",
   };
   // WebGPU when the browser has it, else multi-/single-threaded WASM.
-  const backends: Array<"webgpu" | "wasm"> =
-    !only && typeof navigator !== "undefined" && "gpu" in navigator ? ["webgpu", "wasm"] : ["wasm"];
+  const backends: Array<"webgpu" | "wasm"> = !only && (await hasWebGpu()) ? ["webgpu", "wasm"] : ["wasm"];
   let lastErr: unknown;
   for (const backend of backends) {
     try {
@@ -119,10 +177,11 @@ async function rtmlibDetector(pose3dModel: "rtmw3d" | "instanthmr", onProgress?:
         // EfficientDet-Lite0 (Apache-2.0) as person detector; the YOLO options are AGPL-licensed.
         objectModel: "mediapipe",
         pose3dModel,
+        // Local copy for RTMW (library cache off to avoid storing it twice).
+        ...(poseModel ? { poseModel, cache: false } : { cache: true }),
         backend,
         poseConfidence: 0.01, // keep raw scores; the app applies its own reliability model
         detConfidence: 0.4,
-        cache: true,
         onInitProgress: (stage) => stages[stage] && onProgress?.(stages[stage]),
       });
       await timeout(d.init(), 300_000, pose3dModel === "rtmw3d" ? "the RTMW model" : "the InstantHMR model");
@@ -234,4 +293,14 @@ function personBox(kp2: number[][], scores: number[]) {
     n++;
   });
   return n ? { x1, y1, x2, y2, confidence: s / n } : { x1: 0, y1: 0, x2: 0, y2: 0, confidence: 0 };
+}
+
+/** True only when the browser can actually provide a WebGPU adapter. */
+async function hasWebGpu(): Promise<boolean> {
+  try {
+    const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
+    return !!gpu && !!(await gpu.requestAdapter());
+  } catch {
+    return false;
+  }
 }
