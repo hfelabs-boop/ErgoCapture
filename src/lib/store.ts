@@ -99,7 +99,8 @@ export const useStore = create<State>((set, get) => ({
   title: "Workstation assessment",
   aiNarrative: null,
   reportNarrative: "template",
-  setAiNarrative: (aiNarrative) => set({ aiNarrative, reportNarrative: aiNarrative ? "ai" : "template" }),
+  // Reports keep the standard narrative until the user explicitly picks the AI one.
+  setAiNarrative: (aiNarrative) => set({ aiNarrative, reportNarrative: "template" }),
   setReportNarrative: (reportNarrative) => set({ reportNarrative }),
   addView: (v) => set({ views: [...get().views, v] }),
   updateView: (id, patch) => set({ views: get().views.map((v) => (v.id === id ? { ...v, ...patch } : v)) }),

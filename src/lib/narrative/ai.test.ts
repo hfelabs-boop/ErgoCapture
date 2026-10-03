@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { guardNumbers, numbersIn, parseSections } from "./aiCore";
+import { guardClaims, guardNumbers, numbersIn, parseSections } from "./aiCore";
 
 describe("AI narrative guards", () => {
   it("parses markdown sections and strips thinking", () => {
@@ -20,5 +20,20 @@ describe("AI narrative guards", () => {
 
   it("normalises numbers", () => {
     expect(numbersIn("4.080 and 27%").has("4.08")).toBe(true);
+  });
+
+  it("drops reassuring sentences that contradict a medium-or-higher risk", () => {
+    const sections = [
+      {
+        heading: "Confidence",
+        paragraphs: [
+          "The assessment concluded that the posture meets standard safety criteria. REBA peaked at 11. Static postures were not within acceptable limits.",
+        ],
+      },
+    ];
+    const high = guardClaims(sections, 4);
+    expect(high.removed).toBe(1);
+    expect(high.sections[0].paragraphs[0]).toBe("REBA peaked at 11. Static postures were not within acceptable limits.");
+    expect(guardClaims(sections, 0).removed).toBe(0);
   });
 });

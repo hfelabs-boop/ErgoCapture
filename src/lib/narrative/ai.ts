@@ -1,7 +1,7 @@
 "use client";
 
 import { isConstrainedDevice } from "../pose/engines";
-import { AI_MODELS, type AiDevice, type FrameInput } from "./aiCore";
+import { AI_MODELS, guardClaims, type AiDevice, type FrameInput } from "./aiCore";
 import { factSheet, type Narrative } from "./template";
 
 /**
@@ -96,6 +96,8 @@ async function runWorker(job: Record<string, unknown>, transfer: Transferable[],
 export async function generateAiNarrative(
   template: Narrative,
   frames: Array<{ t: number; canvas: HTMLCanvasElement }>,
+  /** Measured overall risk (0–4): reassuring AI sentences are removed when ≥ 2 */
+  overallRisk: number,
   o: AiOptions,
 ): Promise<Narrative & { removedSentences: number }> {
   const inputs: FrameInput[] = frames.map((f) => {
@@ -118,14 +120,15 @@ export async function generateAiNarrative(
   } catch {
     /* storage unavailable */
   }
-  if (!res.sections.length) throw new Error("The AI model did not produce a usable narrative. Use the standard narrative.");
+  const claims = guardClaims(res.sections, overallRisk);
+  if (!claims.sections.length) throw new Error("The AI model did not produce a usable narrative. Use the standard narrative.");
   return {
     title: template.title,
     source: "ai",
     model: res.frameNotes.length ? `${res.model} + ${AI_MODELS.vision.name}` : res.model,
     // Descriptive sections from the model; recommendations verbatim from the rule-based engine.
-    sections: [...res.sections, ...template.sections.filter((s) => s.heading === "Recommendations")],
+    sections: [...claims.sections, ...template.sections.filter((s) => s.heading === "Recommendations")],
     frameNotes: res.frameNotes,
-    removedSentences: res.removed,
+    removedSentences: res.removed + claims.removed,
   };
 }

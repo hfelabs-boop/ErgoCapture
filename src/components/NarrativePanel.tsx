@@ -42,13 +42,14 @@ export function NarrativePanel({ a, videoUrl, videoOffsetSec }: { a: SessionAnal
       if (valid.length) idx.push(valid[Math.floor(valid.length / 2)]);
       const times = [...new Set(idx)].map((i) => a.frames[i].t).sort((x, y) => x - y);
       const frames = videoUrl ? await rawFrames(videoUrl, times, videoOffsetSec) : [];
-      const n = await generateAiNarrative({ ...template, title }, frames, {
+      const n = await generateAiNarrative({ ...template, title }, frames, a.overall.risk, {
         device: avail.device,
         signal: abort.current.signal,
         onProgress: setBusy,
       });
       setAi(n);
-      if (n.removedSentences) setError(`${n.removedSentences} AI sentence(s) contained numbers that are not in the measured results and were removed.`);
+      if (n.removedSentences)
+        setError(`${n.removedSentences} AI sentence(s) were removed because they used numbers not in the measured results or contradicted the measured risk.`);
     } catch (e) {
       if ((e as Error).name !== "AbortError") setError(`AI narrative failed: ${(e as Error).message}`);
     } finally {
@@ -69,7 +70,8 @@ export function NarrativePanel({ a, videoUrl, videoOffsetSec }: { a: SessionAnal
       >
         {shown.source === "ai" && (
           <p className="mb-3 rounded-md bg-sky-50 px-2 py-1.5 text-xs text-sky-800">
-            Written on this device by an AI model from the measured results. Numbers not found in the results were removed, but wording can still be imprecise: check before use.
+            Beta: written on this device by a small AI model from the measured results. Sentences with numbers not in the results, or that contradict the measured risk,
+            were removed, but small models can still misstate things: check before use. Reports use the standard narrative unless you choose this one.
           </p>
         )}
         <div className="space-y-4">
@@ -110,7 +112,7 @@ export function NarrativePanel({ a, videoUrl, videoOffsetSec }: { a: SessionAnal
             <p className="text-xs text-slate-500">The chosen narrative is used by Print and by the PDF and Word reports.</p>
           </div>
         </Card>
-        <Card title="AI narrative (optional)">
+        <Card title="AI narrative (optional, beta)">
           {!avail ? (
             <p className="text-sm text-slate-500">Checking this device…</p>
           ) : !avail.ok ? (

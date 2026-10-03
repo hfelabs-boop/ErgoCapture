@@ -207,3 +207,33 @@ async function writeWith(
   }
 }
 
+
+const SAFE_CLAIM = /\b(meets?|within|compl(?:y|ies|iant)|satisf(?:y|ies|actory)|acceptable|safe(?:ly)?|no (?:significant |major )?risks?|low[- ]risk|not (?:at )?risk|poses? (?:little|no))\b/i;
+
+/**
+ * Drop sentences that call the work safe or acceptable when the measured
+ * overall risk is medium or higher — small models sometimes contradict the
+ * results in reassuring language.
+ */
+export function guardClaims(sections: NarrativeSection[], overallRisk: number) {
+  if (overallRisk < 2) return { sections, removed: 0 };
+  let removed = 0;
+  const kept = sections
+    .map((s) => ({
+      heading: s.heading,
+      paragraphs: s.paragraphs
+        .map((p) =>
+          p
+            .split(/(?<=[.!?])\s+/)
+            .filter((sentence) => {
+              const bad = SAFE_CLAIM.test(sentence) && !/\b(not|never|exceed|above|beyond|outside)\b[^.]*\b(acceptable|safe|within)\b/i.test(sentence);
+              if (bad) removed++;
+              return !bad;
+            })
+            .join(" "),
+        )
+        .filter((p) => p.trim()),
+    }))
+    .filter((s) => s.paragraphs.length);
+  return { sections: kept, removed };
+}
