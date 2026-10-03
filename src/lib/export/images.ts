@@ -109,3 +109,20 @@ export async function buildReportImages(
   const worst = await worstMoments(a, primary, videoUrl, opts, videoOffsetSec);
   return { rulaChart: chartImage(a, "rula"), rebaChart: chartImage(a, "reba"), heatmap: heatmapImage(a), worst };
 }
+
+/** Plain video frames (no overlay) at the given analysis times, for the vision model. */
+export async function rawFrames(videoUrl: string, times: number[], videoOffsetSec = 0, maxWidth = 640) {
+  const video = await loadVideo(videoUrl);
+  const out: Array<{ t: number; canvas: HTMLCanvasElement }> = [];
+  for (const t of times) {
+    await new Promise<void>((r) => {
+      video.onseeked = () => r();
+      video.currentTime = Math.max(0, t - videoOffsetSec);
+    });
+    const w = Math.min(maxWidth, video.videoWidth);
+    const c = canvas(w, Math.round((w * video.videoHeight) / video.videoWidth));
+    c.getContext("2d")!.drawImage(video, 0, 0, c.width, c.height);
+    out.push({ t, canvas: c });
+  }
+  return out;
+}

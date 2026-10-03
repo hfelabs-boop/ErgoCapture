@@ -2,6 +2,7 @@
 
 import type { SessionAnalysis } from "../ergo/analyze";
 import { RISK_COLORS } from "../ergo/risk";
+import type { Narrative } from "../narrative/template";
 import type { ReportImages } from "./images";
 import { buildSections, methodsText, summaryRows } from "./reportModel";
 
@@ -13,7 +14,7 @@ function dataUrlBytes(url: string) {
   return out;
 }
 
-export async function exportDocx(a: SessionAnalysis, images: ReportImages, title: string) {
+export async function exportDocx(a: SessionAnalysis, images: ReportImages, title: string, narrative: Narrative) {
   const d = await import("docx");
   const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, ImageRun, ShadingType } = d;
   const p = (text: string, opts: { bold?: boolean; color?: string; size?: number } = {}) =>
@@ -66,8 +67,20 @@ export async function exportDocx(a: SessionAnalysis, images: ReportImages, title
       rows.map((r) => [r.method, r.result, r.riskText, `${r.confLevel} (${(r.conf * 100).toFixed(0)}%)`]),
       (ri, ci) => (ci === 2 ? RISK_COLORS[rows[ri].risk].slice(1) : undefined),
     ),
-    h("Recommendations"),
-    ...a.recommendations.map((r, i) => p(`${i + 1}. ${r}`)),
+    h(narrative.source === "ai" ? `Narrative (written on-device by ${narrative.model})` : "Narrative"),
+    ...(narrative.source === "ai"
+      ? [p("AI-written from the measured results; numbers not found in the results were removed. Check before use.", { color: "64748B" })]
+      : []),
+    ...narrative.sections.flatMap((s) => [
+      h(s.heading, HeadingLevel.HEADING_3),
+      ...s.paragraphs.map((t, i) => p(s.heading === "Recommendations" ? `${i + 1}. ${t}` : t)),
+    ]),
+    ...(narrative.frameNotes?.length
+      ? [
+          h("What the camera shows (AI description, indicative)", HeadingLevel.HEADING_3),
+          ...narrative.frameNotes.map((f) => p(`${Math.floor(f.t / 60)}:${String(Math.floor(f.t % 60)).padStart(2, "0")}  ${f.text}`)),
+        ]
+      : []),
     h("Scores over time"),
     img(images.rulaChart, 620, 136, "png"),
     img(images.rebaChart, 620, 136, "png"),

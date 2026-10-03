@@ -1,0 +1,7 @@
+{
+  "name": "sharp",
+  "version": "0.0.0-stub",
+  "description": "Empty stand-in: ErgoCapture uses @huggingface/transformers only in the browser, which never loads sharp. Avoids downloading native binaries on install.",
+  "main": "index.js",
+  "license": "MIT"
+}

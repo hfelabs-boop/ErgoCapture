@@ -2,6 +2,7 @@
 
 import type { SessionAnalysis } from "../ergo/analyze";
 import { CONFIDENCE_COLORS, RISK_COLORS } from "../ergo/risk";
+import type { Narrative } from "../narrative/template";
 import type { ReportImages } from "./images";
 import { buildSections, methodsText, summaryRows } from "./reportModel";
 
@@ -21,7 +22,7 @@ export function pdfSafe(s: string) {
 
 const hex = (h: string): [number, number, number] => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 
-export async function exportPdf(a: SessionAnalysis, images: ReportImages, title: string) {
+export async function exportPdf(a: SessionAnalysis, images: ReportImages, title: string, narrative: Narrative) {
   const { jsPDF } = await import("jspdf");
   const { default: autoTable } = await import("jspdf-autotable");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
@@ -100,8 +101,17 @@ export async function exportPdf(a: SessionAnalysis, images: ReportImages, title:
   });
   y = lastY() + 6;
 
-  heading("Recommendations");
-  a.recommendations.forEach((rec, i) => para(`${i + 1}. ${rec}`));
+  heading(narrative.source === "ai" ? `Narrative (written on-device by ${narrative.model})` : "Narrative");
+  if (narrative.source === "ai") para("AI-written from the measured results; numbers not found in the results were removed. Check before use.", 8);
+  for (const s of narrative.sections) {
+    heading(s.heading, 10.5);
+    if (s.heading === "Recommendations") s.paragraphs.forEach((p, i) => para(`${i + 1}. ${p}`));
+    else s.paragraphs.forEach((p) => para(p));
+  }
+  if (narrative.frameNotes?.length) {
+    heading("What the camera shows (AI description, indicative)", 10.5);
+    narrative.frameNotes.forEach((f) => para(`${Math.floor(f.t / 60)}:${String(Math.floor(f.t % 60)).padStart(2, "0")}  ${f.text}`));
+  }
   y += 2;
 
   const cw = W - 2 * M;

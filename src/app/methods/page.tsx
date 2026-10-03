@@ -145,6 +145,20 @@ export default function Methods() {
         />
       </S>
 
+      <S id="narrative" title="3b. Narrative report">
+        <p>
+          <b>Standard narrative.</b> Written by the app directly from the computed results: overview, working postures, highest-risk moments, assessment results,
+          recommendations, and confidence. It is instant, works on every device, and contains only numbers from the analysis.
+        </p>
+        <p>
+          <b>AI narrative (optional, laptops/desktops with WebGPU).</b> Two open models from Hugging Face run in a background worker in the browser; nothing is uploaded.
+          SmolVLM2-500M (Apache-2.0) describes the worst moments and one typical frame of the video; Qwen3-1.7B (Apache-2.0) rewrites the standard narrative and those
+          descriptions as a report. It is told to use only the given facts, and any sentence containing a number that is not in the measured results is removed. The
+          models (≈ 1.8 GB) download once after confirmation and are cached. It is turned off on phones and tablets and in browsers without WebGPU; in skeleton-only mode
+          the video is not used. Wording can still be imprecise, so the report marks it as AI-written and you choose which narrative goes into Print, PDF and Word.
+        </p>
+      </S>
+
       <S id="confidence" title="4. How confidence is computed">
         <p>Every angle gets a reliability between 0 and 1:</p>
         <ul className="list-disc space-y-1 pl-5">

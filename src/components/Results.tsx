@@ -8,16 +8,18 @@ import { RISK_COLORS, type RiskLevel, type ScoredFrame } from "@/lib/ergo/risk";
 import { analysisToCsv, download } from "@/lib/export/csv";
 import { buildReportImages } from "@/lib/export/images";
 import { summaryRows } from "@/lib/export/reportModel";
+import { templateNarrative } from "@/lib/narrative/template";
 import { makeSessionFile } from "@/lib/pose/importExport";
 import { selectedTracks, useStore } from "@/lib/store";
 import { useCallback, useMemo, useState } from "react";
 import { BodyHeatmap } from "./BodyHeatmap";
+import { NarrativePanel } from "./NarrativePanel";
 import { Player } from "./Player";
 import { SettingsPanel } from "./SettingsPanel";
 import { Timeline } from "./Timeline";
 import { Button, Card, ConfBadge, RiskBadge, Stat, Tabs, Toggle } from "./ui";
 
-type Tab = "summary" | "rula" | "reba" | "owas" | "niosh" | "repetitive" | "static" | "reach" | "body" | "data";
+type Tab = "summary" | "narrative" | "rula" | "reba" | "owas" | "niosh" | "repetitive" | "static" | "reach" | "body" | "data";
 
 const fmtT = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, "0")}`;
 const pct = (x: number) => `${x.toFixed(0)}%`;
@@ -58,12 +60,14 @@ export function Results({ a }: { a: SessionAnalysis }) {
     try {
       const images = await buildReportImages(a, primaryTrack, primaryView?.url, privacy, primaryView?.offsetSec ?? 0);
       const name = `${title.replace(/[^\w-]+/g, "_") || "ergocapture"}`;
+      const st = useStore.getState();
+      const narrative = st.reportNarrative === "ai" && st.aiNarrative ? st.aiNarrative : templateNarrative(a, title);
       if (kind === "pdf") {
         const { exportPdf } = await import("@/lib/export/pdf");
-        download(`${name}.pdf`, await exportPdf(a, images, title), "application/pdf");
+        download(`${name}.pdf`, await exportPdf(a, images, title, narrative), "application/pdf");
       } else {
         const { exportDocx } = await import("@/lib/export/docx");
-        download(`${name}.docx`, await exportDocx(a, images, title), "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        download(`${name}.docx`, await exportDocx(a, images, title, narrative), "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
       }
     } catch (e) {
       alert(`Export failed: ${(e as Error).message}`);
@@ -122,6 +126,7 @@ export function Results({ a }: { a: SessionAnalysis }) {
         onChange={setTab}
         tabs={[
           { key: "summary", label: "Summary" },
+          { key: "narrative", label: "Narrative" },
           { key: "rula", label: "RULA" },
           { key: "reba", label: "REBA" },
           { key: "owas", label: "OWAS" },
@@ -190,6 +195,10 @@ export function Results({ a }: { a: SessionAnalysis }) {
             </Card>
           </div>
         </div>
+      )}
+      {tab === "narrative" && (
+        // In skeleton-only mode the video is not used for AI frame descriptions either.
+        <NarrativePanel a={a} videoUrl={privacy.skeletonOnly ? undefined : primaryView?.url} videoOffsetSec={primaryView?.offsetSec ?? 0} />
       )}
       {tab === "rula" && <ScoreTab a={a} which="rula" onSeek={seek} />}
       {tab === "reba" && <ScoreTab a={a} which="reba" onSeek={seek} />}

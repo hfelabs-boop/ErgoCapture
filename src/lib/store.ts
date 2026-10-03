@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import type { SessionAnalysis } from "./ergo/analyze";
+import type { Narrative } from "./narrative/template";
 import type { Calibration } from "./ergo/measures";
 import { DEFAULT_SETTINGS, type TaskSettings } from "./ergo/settings";
 import type { ModelVariant } from "./pose/detector";
@@ -57,6 +58,12 @@ interface State {
   privacy: Privacy;
   analysis: SessionAnalysis | null;
   title: string;
+  /** AI-written narrative for the current analysis (null until generated) */
+  aiNarrative: Narrative | null;
+  /** Which narrative goes into reports and print */
+  reportNarrative: "template" | "ai";
+  setAiNarrative: (n: Narrative | null) => void;
+  setReportNarrative: (k: "template" | "ai") => void;
   addView: (v: ViewSource) => void;
   updateView: (id: string, patch: Partial<ViewSource>) => void;
   removeView: (id: string) => void;
@@ -90,6 +97,10 @@ export const useStore = create<State>((set, get) => ({
   privacy: { blurFaces: true, skeletonOnly: false },
   analysis: null,
   title: "Workstation assessment",
+  aiNarrative: null,
+  reportNarrative: "template",
+  setAiNarrative: (aiNarrative) => set({ aiNarrative, reportNarrative: aiNarrative ? "ai" : "template" }),
+  setReportNarrative: (reportNarrative) => set({ reportNarrative }),
   addView: (v) => set({ views: [...get().views, v] }),
   updateView: (id, patch) => set({ views: get().views.map((v) => (v.id === id ? { ...v, ...patch } : v)) }),
   removeView: (id) => {
@@ -118,7 +129,8 @@ export const useStore = create<State>((set, get) => ({
     set({ process });
   },
   setPrivacy: (patch) => set({ privacy: { ...get().privacy, ...patch } }),
-  setAnalysis: (analysis) => set({ analysis }),
+  // A new analysis invalidates any AI narrative written for the previous one.
+  setAnalysis: (analysis) => set({ analysis, aiNarrative: null, reportNarrative: "template" }),
   setTitle: (title) => set({ title }),
   reset: () => {
     for (const v of get().views) if (v.url) URL.revokeObjectURL(v.url);
