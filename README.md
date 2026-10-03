@@ -38,6 +38,10 @@ The RTMW model is served from [Hfelabs/ergocapture-models](https://huggingface.c
 
 Browser engines come from [rtmlib-ts](https://github.com/GOH23/rtmlib-ts) on ONNX Runtime Web (WebGPU, else multi-threaded WebAssembly; the site sends COOP/COEP headers for threading). Person detection uses EfficientDet-Lite0 (Apache-2.0) rather than the AGPL YOLO models. `scripts/patch-rtmlib.mjs` pins the MediaPipe WASM version rtmlib-ts loads, and `package.json` pins `onnxruntime-web` to the version whose WASM it fetches.
 
+## Narrative report
+
+Every analysis gets a plain-language narrative written from the computed results (`src/lib/narrative/template.ts`), shown in the Narrative tab, printable, and included in the PDF/Word reports. On laptops/desktops with WebGPU an optional AI narrative runs in a Web Worker with Transformers.js: SmolVLM2-500M describes key video frames and Qwen3-1.7B rewrites the facts (≈ 1.8 GB, downloaded once after confirmation). Sentences with numbers not present in the results are dropped. It is disabled on phones and tablets. `@huggingface/transformers` pulls Node-only packages (`onnxruntime-node`, `sharp`); `stubs/` replaces them so installs stay fast, since the browser build never loads them.
+
 ## SAM 3D Body (GPU server tier)
 
 For the most accurate assessments, `server/sam3d_body/` runs Meta's [SAM 3D Body](https://github.com/facebookresearch/sam-3d-body) on a CUDA GPU (Docker image, HTTP job server and CLI). Choose **SAM 3D Body** as the pose engine on the Analyze page and enter your server URL, or convert videos with the CLI and open the `.pose.json` files. It returns a full-body mesh fit with finger joints (`mhr70` keypoints), which improves robustness to occlusion and makes wrist angles reliable. See [server/sam3d_body/README.md](server/sam3d_body/README.md). Vercel only hosts the web app; the GPU server runs on your own hardware or cloud GPU.
