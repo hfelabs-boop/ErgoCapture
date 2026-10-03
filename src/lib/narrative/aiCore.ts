@@ -156,13 +156,30 @@ export function parseSections(md: string): NarrativeSection[] {
   return sections.filter((s) => s.paragraphs.length);
 }
 
+/** Write with the large model; if it does not fit in memory, retry once with the small one. */
 export async function writeNarrative(facts: string, frameNotes: Array<{ t: number; text: string }>, o: CoreOptions) {
+  const first = o.device === "webgpu" || o.fullWriter ? AI_MODELS.text : AI_MODELS.textCpu;
+  try {
+    return await writeWith(first, facts, frameNotes, o);
+  } catch (e) {
+    if (first === AI_MODELS.textCpu) throw e;
+    o.onProgress?.(`${first.name} did not fit in this device's memory; using the smaller ${AI_MODELS.textCpu.name}…`);
+    return await writeWith(AI_MODELS.textCpu, facts, frameNotes, o);
+  }
+}
+
+async function writeWith(
+  m: { id: string; name: string },
+  facts: string,
+  frameNotes: Array<{ t: number; text: string }>,
+  o: CoreOptions,
+) {
   const tf = await import("@huggingface/transformers");
-  const m = o.device === "webgpu" || o.fullWriter ? AI_MODELS.text : AI_MODELS.textCpu;
   const onp = progressReporter("writing model", o.onProgress);
   const generator = await tf.pipeline("text-generation", m.id, {
     device: o.device,
     dtype: o.device === "webgpu" ? "q4f16" : "int8",
+    // (both Qwen3 sizes ship q4f16 for WebGPU and int8 for CPU)
     progress_callback: onp,
   });
   const seen = frameNotes.length
