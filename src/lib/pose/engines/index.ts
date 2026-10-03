@@ -29,7 +29,7 @@ export const ENGINES: Record<EngineId, EngineInfo> = {
     id: "rtmw",
     label: "RTMW whole-body (recommended)",
     source: "RTMW3D-X",
-    download: "≈ 370 MB on first use, then cached",
+    download: "≈ 190 MB on first use, then cached",
     licence: "Apache-2.0",
     detailedHands: true,
     where: "browser",
@@ -70,12 +70,18 @@ export const ENGINES: Record<EngineId, EngineInfo> = {
 export const BROWSER_ENGINES: EngineId[] = ["rtmw", "mediapipe", "instanthmr"];
 
 /** Model files the app loads; also the keys of the browser's model cache. */
-export const RTMW_MODEL_URL =
+/**
+ * RTMW3D-X with float16-stored weights (compute stays float32): 187 MB instead
+ * of 369 MB. Converted and validated for this app; see the model card.
+ */
+export const RTMW_MODEL_URL = "https://huggingface.co/Hfelabs/ergocapture-models/resolve/main/rtmw3d-x-fp16w.onnx";
+/** Original full-size export, used only if the copy above is unreachable. */
+export const RTMW_MODEL_FALLBACK_URL =
   "https://huggingface.co/Soykaf/RTMW3D-x/resolve/main/onnx/rtmw3d-x_8xb64_cocktail14-384x288-b0a0eab7_20240626.onnx";
 export const INSTANTHMR_MODEL_URL = "https://huggingface.co/momolesang/InstantHMR/resolve/main/instanthmr.onnx";
 
 const BIG_MODELS: Partial<Record<EngineId, { url: string; mb: number }>> = {
-  rtmw: { url: RTMW_MODEL_URL, mb: 370 },
+  rtmw: { url: RTMW_MODEL_URL, mb: 187 },
   instanthmr: { url: INSTANTHMR_MODEL_URL, mb: 80 },
 };
 
@@ -161,7 +167,9 @@ async function rtmlibDetector(pose3dModel: "rtmw3d" | "instanthmr", onProgress?:
   // no second download on fallback) and pass a local URL.
   const poseModel =
     pose3dModel === "rtmw3d"
-      ? await modelObjectUrl(RTMW_MODEL_URL, (f) => onProgress?.(`Downloading RTMW model… ${Math.round(f * 100)}% (≈ 370 MB, first use only)`))
+      ? await modelObjectUrl(RTMW_MODEL_URL, (f) => onProgress?.(`Downloading RTMW model… ${Math.round(f * 100)}% (≈ 190 MB, first use only)`)).catch(() =>
+          modelObjectUrl(RTMW_MODEL_FALLBACK_URL, (f) => onProgress?.(`Downloading RTMW model (mirror)… ${Math.round(f * 100)}% (≈ 370 MB)`)),
+        )
       : undefined;
   const stages: Record<string, string> = {
     "mp-init": "Loading person detector…",

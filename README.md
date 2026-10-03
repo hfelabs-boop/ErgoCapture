@@ -29,10 +29,12 @@ The pose model (`pose_landmarker_{lite,full,heavy}.task`) is fetched from Google
 
 | Engine | Runs | Notes |
 |---|---|---|
-| **RTMW3D-X** (default on laptops/desktops) | browser | 133 whole-body keypoints incl. finger joints; ≈ 370 MB, downloaded once after the user confirms, then stored in the browser; Apache-2.0 |
+| **RTMW3D-X** (default on laptops/desktops) | browser | 133 whole-body keypoints incl. finger joints; ≈ 190 MB, downloaded once after the user confirms, then stored in the browser; Apache-2.0 |
 | MediaPipe Pose (default on phones / slow connections) | browser | fastest, best for live use on phones; coarse hands; Apache-2.0 |
 | SAM 3D Body Lite (InstantHMR) | browser | ≈ 80 MB distillation of SAM 3D Body; SAM License |
 | SAM 3D Body | your GPU server | see below; SAM License |
+
+The RTMW model is served from [Hfelabs/ergocapture-models](https://huggingface.co/Hfelabs/ergocapture-models): the same RTMW3D-X with weights stored as float16 (compute stays float32), 187 MB instead of 369 MB; keypoints used for the angles match the original within 0.6 px. The original export is the automatic fallback.
 
 Browser engines come from [rtmlib-ts](https://github.com/GOH23/rtmlib-ts) on ONNX Runtime Web (WebGPU, else multi-threaded WebAssembly; the site sends COOP/COEP headers for threading). Person detection uses EfficientDet-Lite0 (Apache-2.0) rather than the AGPL YOLO models. `scripts/patch-rtmlib.mjs` pins the MediaPipe WASM version rtmlib-ts loads, and `package.json` pins `onnxruntime-web` to the version whose WASM it fetches.
 

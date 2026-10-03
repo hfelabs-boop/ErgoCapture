@@ -92,7 +92,7 @@ export default function Methods() {
               <b key="r">RTMW3D-X (default)</b>,
               "Browser (WebGPU or multi-threaded WebAssembly)",
               "133 whole-body: body, feet, face, all finger joints; per-keypoint scores",
-              "≈ 370 MB once, then cached",
+              "≈ 190 MB once, then cached",
               "Apache-2.0",
               "Recorded video on a laptop/desktop; reliable wrist angles",
             ],
@@ -110,7 +110,7 @@ export default function Methods() {
         />
         <p>
           <b>Choosing and downloading.</b> Laptops and desktops start with RTMW; phones, tablets and slow or data-saver connections start with MediaPipe. Before RTMW&apos;s
-          one-time ≈ 370 MB download the app asks first (with the option to use MediaPipe instead), shows download progress, and stores the model in the browser so later
+          one-time ≈ 190 MB download the app asks first (with the option to use MediaPipe instead), shows download progress, and stores the model in the browser so later
           runs start without downloading. A private window or a nearly full disk may prevent storing it; the dialog warns when that is likely.
         </p>
         <p>

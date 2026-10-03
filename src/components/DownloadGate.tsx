@@ -7,7 +7,7 @@ import { Button } from "./ui";
 type Choice = EngineId | null;
 
 /**
- * Ask before a large one-time model download (RTMW ≈ 370 MB). Resolves with
+ * Ask before a large one-time model download (RTMW ≈ 190 MB). Resolves with
  * the engine to use: the requested one, MediaPipe instead, or null (cancel).
  * Nothing is asked when the model is already in the browser cache.
  */
