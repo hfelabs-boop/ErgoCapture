@@ -56,10 +56,42 @@ export interface AiOptions {
   signal?: AbortSignal;
 }
 
+type Notes = Array<{ t: number; text: string }>;
 type WorkerMsg =
   | { type: "progress"; message: string }
-  | { type: "result"; sections: Narrative["sections"]; removed: number; model: string; frameNotes: Array<{ t: number; text: string }> }
-  | { type: "error"; message: string };
+  | { type: "result"; sections: Narrative["sections"]; removed: number; model: string; frameNotes: Notes }
+  | { type: "error"; message: string; oom?: boolean; frameNotes?: Notes };
+
+class WorkerError extends Error {
+  constructor(
+    message: string,
+    public oom: boolean,
+    public frameNotes?: Notes,
+  ) {
+    super(message);
+  }
+}
+
+/** One attempt in a fresh worker (fresh memory). */
+async function runWorker(job: Record<string, unknown>, transfer: Transferable[], o: AiOptions) {
+  const worker = new Worker(new URL("./ai.worker.ts", import.meta.url), { type: "module" });
+  try {
+    return await new Promise<Extract<WorkerMsg, { type: "result" }>>((resolve, reject) => {
+      o.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+      worker.onerror = (e) => reject(new WorkerError(e.message || "AI worker failed", false));
+      worker.onmessage = (e: MessageEvent<WorkerMsg>) => {
+        const m = e.data;
+        if (m.type === "progress") o.onProgress?.(m.message);
+        else if (m.type === "error") reject(new WorkerError(m.message, !!m.oom, m.frameNotes));
+        else resolve(m);
+      };
+      worker.postMessage(job, transfer);
+    });
+  } finally {
+    // Terminating frees the models' memory and stops work immediately on cancel.
+    worker.terminate();
+  }
+}
 
 export async function generateAiNarrative(
   template: Narrative,
@@ -70,37 +102,30 @@ export async function generateAiNarrative(
     const img = f.canvas.getContext("2d")!.getImageData(0, 0, f.canvas.width, f.canvas.height);
     return { t: f.t, width: img.width, height: img.height, data: img.data };
   });
-  const worker = new Worker(new URL("./ai.worker.ts", import.meta.url), { type: "module" });
+  const fullWriter = new URLSearchParams(window.location.search).get("ai") === "wasm-full";
+  const job = { device: o.device, facts: factSheet(template), fullWriter };
+  let res: Extract<WorkerMsg, { type: "result" }>;
   try {
-    const res = await new Promise<Extract<WorkerMsg, { type: "result" }>>((resolve, reject) => {
-      o.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
-      worker.onerror = (e) => reject(new Error(e.message || "AI worker failed"));
-      worker.onmessage = (e: MessageEvent<WorkerMsg>) => {
-        const m = e.data;
-        if (m.type === "progress") o.onProgress?.(m.message);
-        else if (m.type === "error") reject(new Error(m.message));
-        else resolve(m);
-      };
-      const fullWriter = new URLSearchParams(window.location.search).get("ai") === "wasm-full";
-      worker.postMessage({ device: o.device, facts: factSheet(template), frames: inputs, fullWriter }, inputs.map((f) => f.data.buffer));
-    });
-    try {
-      window.localStorage.setItem(DOWNLOADED_KEY, "1");
-    } catch {
-      /* storage unavailable */
-    }
-    if (!res.sections.length) throw new Error("The AI model did not produce a usable narrative. Use the standard narrative.");
-    return {
-      title: template.title,
-      source: "ai",
-      model: res.frameNotes.length ? `${res.model} + ${AI_MODELS.vision.name}` : res.model,
-      // Descriptive sections from the model; recommendations verbatim from the rule-based engine.
-      sections: [...res.sections, ...template.sections.filter((s) => s.heading === "Recommendations")],
-      frameNotes: res.frameNotes,
-      removedSentences: res.removed,
-    };
-  } finally {
-    // Terminating frees the models' memory and stops work immediately on cancel.
-    worker.terminate();
+    res = await runWorker({ ...job, frames: inputs }, inputs.map((f) => f.data.buffer), o);
+  } catch (e) {
+    if (!(e instanceof WorkerError) || !e.oom) throw e;
+    // Large writer did not fit: retry with the small one in a fresh worker, reusing the frame notes.
+    o.onProgress?.(`${AI_MODELS.text.name} did not fit in this device's memory; using the smaller ${AI_MODELS.textCpu.name}…`);
+    res = await runWorker({ ...job, frames: [], small: true, frameNotes: e.frameNotes ?? [] }, [], o);
   }
+  try {
+    window.localStorage.setItem(DOWNLOADED_KEY, "1");
+  } catch {
+    /* storage unavailable */
+  }
+  if (!res.sections.length) throw new Error("The AI model did not produce a usable narrative. Use the standard narrative.");
+  return {
+    title: template.title,
+    source: "ai",
+    model: res.frameNotes.length ? `${res.model} + ${AI_MODELS.vision.name}` : res.model,
+    // Descriptive sections from the model; recommendations verbatim from the rule-based engine.
+    sections: [...res.sections, ...template.sections.filter((s) => s.heading === "Recommendations")],
+    frameNotes: res.frameNotes,
+    removedSentences: res.removed,
+  };
 }

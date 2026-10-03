@@ -156,17 +156,13 @@ export function parseSections(md: string): NarrativeSection[] {
   return sections.filter((s) => s.paragraphs.length);
 }
 
-/** Write with the large model; if it does not fit in memory, retry once with the small one. */
-export async function writeNarrative(facts: string, frameNotes: Array<{ t: number; text: string }>, o: CoreOptions) {
-  const first = o.device === "webgpu" || o.fullWriter ? AI_MODELS.text : AI_MODELS.textCpu;
-  try {
-    return await writeWith(first, facts, frameNotes, o);
-  } catch (e) {
-    if (first === AI_MODELS.textCpu) throw e;
-    o.onProgress?.(`${first.name} did not fit in this device's memory; using the smaller ${AI_MODELS.textCpu.name}…`);
-    return await writeWith(AI_MODELS.textCpu, facts, frameNotes, o);
-  }
+/** Pick the writer: the large model on WebGPU, the small one on CPU or after an out-of-memory error. */
+export async function writeNarrative(facts: string, frameNotes: Array<{ t: number; text: string }>, o: CoreOptions & { small?: boolean }) {
+  const m = !o.small && (o.device === "webgpu" || o.fullWriter) ? AI_MODELS.text : AI_MODELS.textCpu;
+  return writeWith(m, facts, frameNotes, o);
 }
+
+export const isOutOfMemory = (e: unknown) => /bad_alloc|allocate|out of memory|OOM/i.test(e instanceof Error ? e.message : String(e));
 
 async function writeWith(
   m: { id: string; name: string },
