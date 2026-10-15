@@ -160,14 +160,16 @@ Score = (recovery + frequency + force + posture + additional) × duration multip
 
 ## 7. Confidence of each score
 
-1. Each angle has a reliability r (section 3) and an assumed error σ that grows as r falls: 2° + 12°·(1 − r) for bending and joint angles, 5° + 15°·(1 − r) for twist, 1 cm + 8 cm·(1 − r) for distances.
-2. The frame is re-scored 10–24 times (40 for photos) with every angle perturbed by Gaussian noise of that σ (fixed random seed, so reports are reproducible).
-3. **Stability** = share of re-scores that land on the same risk level as the actual score.
-4. **Confidence** = stability × (0.4 + 0.6 × mean reliability of the angles used). High ≥ 75 %, medium ≥ 50 %, low below.
+1. Each measure has a reliability r (section 3) and an assumed error σ that grows as r falls: 2° + 6°·(1 − r) for bending and joint angles, 4° + 10°·(1 − r) for twist, 1 cm + 5 cm·(1 − r) for distances, 3 + 10·(1 − r) percentage points for shoulder elevation. These are the typical errors of smoothed markerless angles reported in the literature (about 3–5° for well-seen joints, more for poorly seen ones and for axial rotation).
+2. **Measurement quality** = mean reliability of the measures that can change this score: those where an error of ±2σ, applied to that measure alone, changes the score. A weak twist or wrist angle far from any threshold therefore does not lower the confidence of a score it cannot change. If no measure can change the score, the mean reliability of all angles is used.
+3. The frame is re-scored 10–24 times (40 for photos) with every measure perturbed by Gaussian noise of its σ (fixed random seed, so reports are reproducible).
+4. **Stability** = share of re-scores that stay on the same action level or within ±1 score point (RULA, REBA); for OWAS, whose score is the action category, the same category.
+5. **Level stability** = share of re-scores on the same action level. Below 60 % the score is flagged **near cut-off**: it is measured well enough, but the posture lies so close to an action-level boundary that a small error could move it to the neighbouring level.
+6. **Confidence** = stability × √(measurement quality). A perfectly measured, stable score reaches 100 %. High ≥ 75 %, medium ≥ 50 %, low below.
 
-A score far from any threshold stays confident even with noisy angles; a score on a threshold does not.
+The tooltip of each confidence badge shows the measurement quality and the level stability separately, so a low confidence can be traced to the camera (low quality: change the set-up) or to the posture (near cut-off: check on the video). Measures that cannot be determined are left out, not assumed: a raised shoulder (shrug) is measured only after neutral-posture calibration.
 
-**Deviations.** The σ values are engineering assumptions. The confidence is a measure of how robust a score is to plausible measurement error, not a validated probability of agreement with an expert. Calibrating it needs reference data (see [Validity](validity.md#6-validation-plan)).
+**Deviations.** The σ values are taken from typical errors in the literature, not measured for ErgoCapture's own pipeline. The confidence is a measure of how robust a score is to plausible measurement error, not a validated probability of agreement with an expert. Calibrating it needs reference data (see [Validity](validity.md#6-validation-plan)).
 
 ## 8. Photos
 

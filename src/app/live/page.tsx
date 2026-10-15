@@ -358,7 +358,7 @@ export default function LivePage() {
                       <div className="tabular text-4xl font-bold" style={{ color: RISK_COLORS[score[k].risk] }}>
                         {score[k].score}
                       </div>
-                      <ConfBadge conf={score[k].conf} label={false} />
+                      <ConfBadge conf={score[k].conf} label={false} detail={score[k]} />
                     </div>
                   ))}
                 </div>

@@ -82,7 +82,7 @@ export function analyzePhotos(inputs: PhotoInput[], settings: TaskSettings, cali
       seated: isSeated(m, settings),
     };
     if (!m.valid) return { id: p.id, name: p.name, width: p.width, height: p.height, image: p.image, found: false, m, context, rula: null, reba: null, owas: null, segments: null };
-    const run = (scorer: typeof scoreRula, seed: number) => scoreWithConfidence(scorer, m.m, m.c, context, settings, 40, seed + i);
+    const run = (scorer: typeof scoreRula, seed: number, tolerance = 1) => scoreWithConfidence(scorer, m.m, m.c, context, settings, 40, seed + i, tolerance);
     return {
       id: p.id,
       name: p.name,
@@ -94,7 +94,7 @@ export function analyzePhotos(inputs: PhotoInput[], settings: TaskSettings, cali
       context,
       rula: run(scoreRula, 11),
       reba: run(scoreReba, 23),
-      owas: run(scoreOwas, 37),
+      owas: run(scoreOwas, 37, 0),
       segments: segmentRisk(m),
     };
   });

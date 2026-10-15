@@ -294,7 +294,7 @@ function ScoreChip({ name, s, prefix = "" }: { name: string; s: ScoredFrame; pre
         {prefix}
         {s.score}
       </div>
-      <ConfBadge conf={s.conf} label={false} />
+      <ConfBadge conf={s.conf} label={false} detail={s} />
     </div>
   );
 }
@@ -332,6 +332,10 @@ function ScoreTab({ a, which, onSeek }: { a: SessionAnalysis; which: "rula" | "r
           <Stat label="Median" value={s.median} />
           <Stat label="Mean confidence" value={pct(s.meanConf * 100)} sub={s.confLevel} />
         </div>
+        <p className="mb-3 text-xs text-slate-500">
+          Measurement quality of the angles that drive the score: {pct(s.meanQuality * 100)}. Near an action-level cut-off {pct(s.nearCutoffPct)} of the time (a small
+          measurement error could move the score to the neighbouring level).
+        </p>
         <Distribution pctByScore={s.pctByScore} riskOf={riskOf} />
       </Card>
       <Card title="Highest-risk moments">
@@ -353,7 +357,7 @@ function ScoreTab({ a, which, onSeek }: { a: SessionAnalysis; which: "rula" | "r
                 </td>
                 <td className="py-1.5 text-xs text-slate-600">{scores[k].drivers.slice(0, 4).join("; ")}</td>
                 <td className="py-1.5">
-                  <ConfBadge conf={scores[k].conf} label={false} />
+                  <ConfBadge conf={scores[k].conf} label={false} detail={scores[k]} />
                 </td>
               </tr>
             ))}

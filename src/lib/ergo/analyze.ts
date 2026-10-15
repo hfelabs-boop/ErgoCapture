@@ -18,7 +18,7 @@ import { ocraChecklist, strainIndex, type OcraSide, type StrainIndexSide } from 
 import { analyzeReach, estimateAnthropometry, workstationFit, type Anthropometry, type ReachResult, type WorkstationFit } from "./reach";
 import { rebaRisk, scoreReba } from "./reba";
 import { recommendations } from "./recommendations";
-import { confidenceLevel, type ConfidenceLevel, type RiskLevel, type ScoredFrame } from "./risk";
+import { confidenceLevel, nearCutoff, type ConfidenceLevel, type RiskLevel, type ScoredFrame } from "./risk";
 import { rulaRisk, scoreRula } from "./rula";
 import type { FrameContext, TaskSettings } from "./settings";
 import { analyzeStatic, type StaticResult } from "./staticPosture";
@@ -40,6 +40,10 @@ export interface ScoreSummary {
   pctByRisk: Record<RiskLevel, number>;
   meanConf: number;
   confLevel: ConfidenceLevel;
+  /** Mean measurement quality of the inputs that drive the score */
+  meanQuality: number;
+  /** Percent of valid time where measurement error would often change the action level */
+  nearCutoffPct: number;
   /** Frame indices of distinct worst moments */
   worstFrames: number[];
   /** Score that is exceeded only 10% of the time, with its confidence */
@@ -175,6 +179,8 @@ function summarize(scores: ScoredFrame[], frames: FrameMeasures[], possible: num
   const pctByRisk = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 } as Record<RiskLevel, number>;
   for (const i of idx) pctByRisk[scores[i].risk] += 100 / n;
   const meanConf = idx.reduce((a, i) => a + scores[i].conf, 0) / n;
+  const meanQuality = idx.reduce((a, i) => a + scores[i].quality, 0) / n;
+  const nearCutoffPct = (idx.filter((i) => nearCutoff(scores[i])).length / n) * 100;
   // Worst distinct moments: highest score, then highest confidence.
   const ranked = [...idx].sort((a, b) => scores[b].score - scores[a].score || scores[b].conf - scores[a].conf);
   const worst: number[] = [];
@@ -194,6 +200,8 @@ function summarize(scores: ScoredFrame[], frames: FrameMeasures[], possible: num
     pctByRisk,
     meanConf,
     confLevel: confidenceLevel(meanConf),
+    meanQuality,
+    nearCutoffPct,
     worstFrames: worst,
     representative: p90,
     representativeConf,
@@ -231,15 +239,15 @@ export function analyzeSession(input: AnalyzeInput): SessionAnalysis {
   const cycles = repetitionAnalysis(frames, fps);
   const contexts = frameContexts(frames, fps, settings, cycles);
   const samples = frames.length > 6000 ? 10 : frames.length > 2000 ? 16 : 24;
-  const run = (scorer: Scorer, seed: number) =>
+  const run = (scorer: Scorer, seed: number, tolerance = 1) =>
     frames.map((f, i) =>
       f.valid
-        ? scoreWithConfidence(scorer, f.m, f.c, contexts[i], settings, samples, seed + i)
-        : { score: 0, risk: 0 as RiskLevel, label: "No person detected", parts: {}, drivers: [], conf: 0, stability: 0 },
+        ? scoreWithConfidence(scorer, f.m, f.c, contexts[i], settings, samples, seed + i, tolerance)
+        : { score: 0, risk: 0 as RiskLevel, label: "No person detected", parts: {}, drivers: [], conf: 0, stability: 0, levelStability: 0, quality: 0 },
     );
   const rula = run(scoreRula, 11);
   const reba = run(scoreReba, 23);
-  const owas = run(scoreOwas, 37);
+  const owas = run(scoreOwas, 37, 0);
 
   const owasDist = { back: [0, 0, 0, 0], arms: [0, 0, 0], legs: [0, 0, 0, 0, 0, 0, 0], load: [0, 0, 0], ac: [0, 0, 0, 0] };
   const nValid = Math.max(1, frames.filter((f) => f.valid).length);

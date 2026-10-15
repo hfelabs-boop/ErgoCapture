@@ -8,6 +8,8 @@ import { rebaTableA, rebaTableB, rebaTableC, scoreReba } from "./reba";
 import { rulaGrand, scoreRula } from "./rula";
 import { DEFAULT_SETTINGS, NEUTRAL_CONTEXT } from "./settings";
 import { strainIndex } from "./repetitive";
+import { scoreWithConfidence } from "./confidence";
+import { nearCutoff } from "./risk";
 
 const m = (o: Partial<SynthPose>) =>
   computeFrameMeasures(toFrame(synthesize({ ...NEUTRAL, yaw: 60, ...o }), 0, 0), { scale: 1, calib: {} }).m;
@@ -148,5 +150,50 @@ describe("full session on the synthetic demo", () => {
     const single = analyzeSession({ tracks: [demoTrack(10, 20, 55)], settings });
     const meanC = (x: typeof b) => x.frames.reduce((s, f) => s + f.c.trunkFlex, 0) / x.frames.length;
     expect(meanC(b)).toBeGreaterThan(meanC(single));
+  });
+});
+
+describe("score confidence", () => {
+  const frame = (o: Partial<SynthPose>, vis = 0.95) => {
+    const f = toFrame(synthesize({ ...NEUTRAL, yaw: 60, ...o }), 0, 0);
+    f.world!.forEach((p) => (p.v = vis));
+    return computeFrameMeasures(f, { scale: 1, calib: {} });
+  };
+
+  it("a clearly seen neutral posture has high confidence", () => {
+    const fm = frame({});
+    const r = scoreWithConfidence(scoreReba, fm.m, fm.c, NEUTRAL_CONTEXT, DEFAULT_SETTINGS, 40, 1);
+    expect(r.conf).toBeGreaterThanOrEqual(0.75);
+    expect(nearCutoff(r)).toBe(false);
+  });
+
+  it("perfect, stable measurements reach full confidence", () => {
+    const fm = frame({ trunkFlex: 70, kneeFlexL: 70, kneeFlexR: 70 });
+    const c = Object.fromEntries(Object.keys(fm.c).map((k) => [k, 1])) as typeof fm.c;
+    const r = scoreWithConfidence(scoreOwas, fm.m, c, NEUTRAL_CONTEXT, DEFAULT_SETTINGS, 40, 1, 0);
+    expect(r.quality).toBe(1);
+    expect(r.conf).toBeGreaterThan(0.9);
+  });
+
+  it("measures that cannot change the score do not lower its quality", () => {
+    const fm = frame({ trunkFlex: 40 });
+    const weak = { ...fm.c, handAsym: 0, handsGap: 0 };
+    const a = scoreWithConfidence(scoreRula, fm.m, fm.c, NEUTRAL_CONTEXT, DEFAULT_SETTINGS, 24, 1);
+    const b = scoreWithConfidence(scoreRula, fm.m, weak, NEUTRAL_CONTEXT, DEFAULT_SETTINGS, 24, 1);
+    expect(b.quality).toBe(a.quality);
+  });
+
+  it("flags postures near an action-level cut-off", () => {
+    const sweep = [0, 10, 20, 30, 40, 50, 60, 70].map((t) => {
+      const fm = frame({ trunkFlex: t });
+      return scoreWithConfidence(scoreReba, fm.m, fm.c, NEUTRAL_CONTEXT, DEFAULT_SETTINGS, 40, 1).levelStability;
+    });
+    expect(Math.min(...sweep)).toBeLessThan(0.6);
+    expect(sweep[0]).toBeGreaterThan(0.8);
+  });
+
+  it("leaves an uncalibrated shrug unknown", () => {
+    const fm = frame({});
+    expect(Number.isNaN(fm.m.shoulderRaiseL)).toBe(true);
   });
 });

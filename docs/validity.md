@@ -119,7 +119,7 @@ What has been checked about ErgoCapture's own calculations, by automated tests t
 | Camera tilt | Vertical misjudged | Neutral-posture calibration on the Live page |
 | Unknown body scale | Distances wrong (NIOSH H/V, reach) and RTMW depth scale affected | Enter the worker's height |
 | Unobservable factors | Load, grip, effort, recovery cannot be seen | Entered in task settings and shown in reports |
-| Scores near a threshold | Small angle errors change the action level | Monte Carlo score stability in every confidence value |
+| Scores near a threshold | Small angle errors change the action level | Monte Carlo score stability in every confidence value; "near cut-off" flag when the action level is unstable |
 | Wrong person in multi-person scenes | Wrong worker assessed | Tracker with person selection (video); largest person (photos) |
 | Activity rules and heuristics (seated, load in hands, static, repetitive) | May misclassify unusual tasks | Settings can override seated and load; the timeline shows the flags |
 
