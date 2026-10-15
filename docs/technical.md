@@ -81,4 +81,4 @@ npm run build
 cd server/sam3d_body && pytest -q   # server tests (no GPU needed)
 ```
 
-What the automated tests cover is listed in [Validity → Verification of the implementation](validity.md#4-verification-of-the-implementation).
+What the automated tests cover is listed in [Validity → Verification of the implementation](validity.md#3-verification-of-the-implementation).
