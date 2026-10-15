@@ -84,20 +84,26 @@ What has been checked about ErgoCapture's own calculations, by automated tests t
 | Joint-angle geometry | Synthetic skeletons with known angles (forward kinematics), camera views of 0°, 45°, 90° and −60° | Trunk, neck, upper arm, elbow, wrist and knee angles recovered within 1° |
 | RTMW mapping (pixels + depth → metric 3D) | Same synthetic postures expressed in RTMW's native format at 0°, 60°, 90° views | Metres-per-pixel within ±10 %; angles within 4–5° |
 | SAM 3D Body / InstantHMR mapping | Synthetic postures in MHR-70 format | Angles within 1° |
-| Scoring tables | Spot checks of RULA, REBA, OWAS table cells; independent cell-by-cell check against published sources | See below |
+| Scoring tables | Unit-test spot checks, plus an independent cell-by-cell comparison with published sources | All cells match (details below) |
 | NIOSH equation | Textbook case (H 40, V 30, D 60, A 0, 1 lift/min, ≤ 2 h, fair) | RWL 9.3 kg as expected; frequency multiplier interpolation and limits checked |
 | Posture scores | Neutral standing, deep stoop, overhead work on synthetic skeletons | Expected scores (e.g. neutral RULA 2 / REBA 1; stoop REBA 7) |
 | Session pipeline | 60 s synthetic pick-and-place job | Lifts detected, repetition detected, activities segmented, stature scaling, multi-view fusion increases confidence |
 | Compressed RTMW model | Original vs float16-weight model in the browser runtime on real images | Ergonomically relevant keypoints within 0.6 px and 0.4 cm |
 | AI narrative guards | Unit tests | Sentences with invented numbers or reassuring claims contradicting a medium+ risk are removed |
 
-**Scoring tables.** _Verification against published sources in progress; this section will list the result._
+**Scoring tables.** Every cell of the tables in the code was compared with published sources (October 2026):
+
+- **RULA** tables A, B and C (272 cells): match the original paper (McAtamney & Corlett, 1993, Tables 1–2; the scanned Table C is partly illegible, and all legible cells match) and the Ergo-Plus RULA worksheet in full. One widely circulated worksheet (OHCOW, 2021) differs from the original paper in five Table A cells; ErgoCapture follows the original paper.
+- **REBA** tables A, B and C (240 cells): match the original paper (Hignett & McAtamney, 2000, Tables 1–3) and the Ergo-Plus REBA worksheet.
+- **OWAS** action-category table (252 cells): matches the Ergonautas reproduction (Universitat Politècnica de València) in full and the majority of other reproductions on every cell. The 1977 original was not accessible; a few secondary reprints disagree with each other in a small number of cells (back 3 / arms 3 and back 1 / arms 3 combinations), where ErgoCapture follows the majority.
+- **NIOSH frequency multipliers** (17 × 6): match Table 5 of the NIOSH Applications Manual (2021 revision), including the zero cells; frequencies below 0.2 lifts/min use the 0.2 row and above 15 lifts/min FM is 0, as in the manual. Interpolating between tabulated frequencies is ErgoCapture's addition.
 
 **Not verified.**
 
 - No comparison of ErgoCapture's angles with motion capture or inertial sensors.
 - No comparison of ErgoCapture's scores with expert raters.
 - The confidence model's parameters (assumed angle errors, engine reliability mappings) are engineering assumptions, not calibrated on reference data.
+- The OWAS table has not been checked against the 1977 original (only against reproductions).
 - The ISO 11226 / EN 1005-4 holding-time curves and the condensed OCRA checklist mappings have not been checked against the standards' text.
 - The AI narrative (beta) has only been tested with the small fallback writer model on a computer without a graphics processor.
 - One observation from testing: on the same single photo of a walking person, MediaPipe gave RULA 6 / REBA 7 while RTMW gave RULA 3 / REBA 1, with MediaPipe reporting a raised arm and neck extension that were not present. The app warns against MediaPipe for photo assessments.
