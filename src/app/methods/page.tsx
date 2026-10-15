@@ -42,6 +42,17 @@ export default function Methods() {
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <h1 className="text-2xl font-semibold">Methods, confidence and limitations</h1>
+      <p className="text-sm text-slate-600">
+        This page is a short overview. The full{" "}
+        <a href="/docs/methods" className="text-sky-700 underline">
+          methods reference
+        </a>{" "}
+        lists every threshold, and{" "}
+        <a href="/docs/validity" className="text-sky-700 underline">
+          Validity of the analytical methods
+        </a>{" "}
+        summarises the evidence and the limitations.
+      </p>
 
       <S id="capture" title="1. Capture">
         <T
