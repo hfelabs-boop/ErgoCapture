@@ -76,7 +76,9 @@ Change inputs later with **Task settings → Re-score**; pose estimation does no
 ## 5. Reading the results
 
 - **Overall risk** — the highest of the "typical high" (90th percentile) RULA and REBA levels and the session methods.
-- **Confidence** next to every score — high / medium / low, from keypoint visibility, camera angle, and whether the score would change under plausible measurement error. A low-confidence score is not wrong, but it should be checked on the video.
+- **Confidence** next to every score — high / medium / low, from how well the camera measured the angles that drive the score and whether the score holds under plausible measurement error. A low-confidence score is not wrong, but it should be checked on the video. Hover the badge to see why:
+  - **Measurement quality** low → improve the set-up: side view, second camera, RTMW engine (much better wrists), neutral-posture calibration (needed to detect raised shoulders).
+  - **Near cut-off** → the posture is close to an action-level boundary; a small error could move the score up or down a level. Check the moment on the video.
 - **Timeline** — RULA and REBA over time, OWAS, activities, static/repetitive periods and confidence. ▼ marks the worst moments; click to jump.
 - **Frame panel** — the scores, reasons and joint angles of the current frame, each angle with a confidence bar.
 - **Tabs:** Summary, Narrative, RULA, REBA, OWAS, NIOSH lifting, OCRA / Strain Index, ISO 11226 / EN 1005-4, Reach & fit, Body heatmap, Data & export.
@@ -97,7 +99,7 @@ Scores use these action levels:
 
 - **PDF / Word** — summary with confidence, narrative, charts, worst moments, body heatmap and method details. Photo assessments get one page per photo.
 - **Print** — a print-ready page of the narrative (video) or all photos.
-- **CSV** — every angle with its confidence and every score, per frame or per photo, for your own statistics.
+- **CSV** — every angle with its confidence and every score with its confidence, measurement quality and level stability, per frame or per photo, for your own statistics.
 - **Skeleton-only session (`.json`)** — the poses, settings and calibration without video, to archive or reopen later.
 - **Narrative** — a standard narrative written from the results (all devices) and an optional AI narrative (beta, laptops/desktops with WebGPU). Reports use the standard narrative unless you choose the AI one.
 

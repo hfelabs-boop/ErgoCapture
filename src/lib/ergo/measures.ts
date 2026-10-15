@@ -281,7 +281,8 @@ export function computeFrameMeasures(frame: PoseFrame, ctx: MeasureContext): Fra
     const neutral = side === "L" ? ctx.calib.earShoulderL : ctx.calib.earShoulderR;
     const es = norm(sub(p(Ear), sh));
     if (neutral) set(`shoulderRaise${side}`, Math.max(0, (1 - es / (neutral * s)) * 100), vis(w, Ear, S), "frontal");
-    else set(`shoulderRaise${side}`, 0, 0.25, "frontal");
+    // Without a neutral reference a shrug cannot be measured: leave it unknown rather than assume 0.
+    else set(`shoulderRaise${side}`, NaN, 0, "frontal");
 
     // Reach: horizontal shoulder→hand distance relative to arm length.
     const armLen = norm(ua) + norm(fa) + norm(hand) * 0.5;

@@ -18,7 +18,7 @@ import { MEASURE_DEFS } from "@/lib/ergo/measures";
 import { useStore, type Privacy } from "@/lib/store";
 import { useEffect, useRef, useState } from "react";
 import { SettingsPanel } from "./SettingsPanel";
-import { Button, Card, ConfBadge, RiskBadge, Toggle } from "./ui";
+import { Button, Card, ConfBadge, RiskBadge, Toggle, type ConfDetail } from "./ui";
 
 const DEF = Object.fromEntries(MEASURE_DEFS.map((d) => [d.key, d]));
 
@@ -39,14 +39,14 @@ function PhotoCanvas({ it, url, privacy }: { it: PhotoResult; url: string; priva
   return <canvas ref={ref} className="block h-auto w-full rounded-lg bg-slate-900" />;
 }
 
-function Chip({ name, score, risk, conf }: { name: string; score: string; risk: number; conf: number }) {
+function Chip({ name, score, risk, conf, detail }: { name: string; score: string; risk: number; conf: number; detail?: ConfDetail }) {
   return (
     <div className="rounded-lg border border-slate-200 p-2 text-center">
       <div className="text-[11px] font-medium text-slate-500">{name}</div>
       <div className="tabular text-2xl font-bold" style={{ color: RISK_COLORS[risk as 0] }}>
         {score}
       </div>
-      <ConfBadge conf={conf} label={false} />
+      <ConfBadge conf={conf} label={false} detail={detail} />
     </div>
   );
 }
@@ -224,9 +224,9 @@ export function PhotoResults({ pa }: { pa: PhotoAnalysis }) {
               ) : (
                 <>
                   <div className="mt-3 grid grid-cols-3 gap-2">
-                    <Chip name="RULA" score={String(it.rula!.score)} risk={it.rula!.risk} conf={it.rula!.conf} />
-                    <Chip name="REBA" score={String(it.reba!.score)} risk={it.reba!.risk} conf={it.reba!.conf} />
-                    <Chip name="OWAS" score={`AC${it.owas!.score}`} risk={it.owas!.risk} conf={it.owas!.conf} />
+                    <Chip name="RULA" score={String(it.rula!.score)} risk={it.rula!.risk} conf={it.rula!.conf} detail={it.rula!} />
+                    <Chip name="REBA" score={String(it.reba!.score)} risk={it.reba!.risk} conf={it.reba!.conf} detail={it.reba!} />
+                    <Chip name="OWAS" score={`AC${it.owas!.score}`} risk={it.owas!.risk} conf={it.owas!.conf} detail={it.owas!} />
                   </div>
                   <p className="mt-2 text-xs text-slate-600">{it.reba!.label}</p>
                   {photoDrivers(it).length > 0 && (

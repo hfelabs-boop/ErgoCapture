@@ -189,12 +189,13 @@ export default function Methods() {
         <ul className="list-disc space-y-1 pl-5">
           <li>the lowest visibility of the keypoints it uses (occlusion, out-of-frame, gap-filled frames are penalised);</li>
           <li>× a camera-view factor: sagittal angles (forward bending, arm flexion) are best seen from the side, frontal-plane angles (side bend, abduction) from the front, twist is always hard from a single horizontal camera;</li>
-          <li>× 0.6 for wrists, which rely on coarse hand points.</li>
+          <li>× 0.6 for wrists from coarse hand points (0.9 with the detailed hand keypoints of RTMW).</li>
         </ul>
         <p>
-          Each score is then re-computed 10–24 times with every angle perturbed by its estimated error (2–14° depending on reliability, more for twist). The share of re-scores
-          landing on the same risk level is the <b>stability</b>. Score confidence = stability × (0.4 + 0.6 × mean input reliability). A posture far from any threshold stays
-          confident even with noisy angles; one sitting on a threshold does not. Levels: high ≥ 75%, medium ≥ 50%, low below.
+          <b>Measurement quality</b> is the mean reliability of the measures that can actually change the score (an error of ±2σ in that measure alone changes it). Each
+          score is then re-computed 10–24 times with every angle perturbed by its estimated error (2–8° depending on reliability, 4–14° for twist). The share of re-scores on
+          the same action level or within ±1 point is the <b>stability</b>. Score confidence = stability × √quality. When fewer than 60% of re-scores stay on the same action
+          level the score is flagged <b>near cut-off</b>: well measured, but close to a boundary. Levels: high ≥ 75%, medium ≥ 50%, low below.
         </p>
       </S>
 

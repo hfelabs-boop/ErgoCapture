@@ -1,6 +1,6 @@
 "use client";
 
-import { CONFIDENCE_COLORS, confidenceLevel, RISK_COLORS, RISK_NAMES, type RiskLevel } from "@/lib/ergo/risk";
+import { CONFIDENCE_COLORS, confidenceLevel, nearCutoff, RISK_COLORS, RISK_NAMES, type RiskLevel } from "@/lib/ergo/risk";
 import type { ReactNode } from "react";
 
 export function Card({ title, children, className = "", actions }: { title?: ReactNode; children: ReactNode; className?: string; actions?: ReactNode }) {
@@ -65,17 +65,34 @@ export function RiskBadge({ risk, text, size = "sm" }: { risk: RiskLevel; text?:
   );
 }
 
-export function ConfBadge({ conf, label = true }: { conf: number; label?: boolean }) {
+export interface ConfDetail {
+  quality: number;
+  levelStability: number;
+}
+
+/** Confidence badge; with `detail`, the tooltip separates measurement quality from closeness to a cut-off. */
+export function ConfBadge({ conf, label = true, detail }: { conf: number; label?: boolean; detail?: ConfDetail }) {
   const lvl = confidenceLevel(conf);
+  const near = detail ? nearCutoff(detail) : false;
+  const title = detail
+    ? `Confidence ${Math.round(conf * 100)}%\nMeasurement quality of the angles that drive this score: ${Math.round(detail.quality * 100)}%\nSame action level in ${Math.round(detail.levelStability * 100)}% of re-scores${near ? " (near a cut-off: check on the video)" : ""}`
+    : "Confidence: how well the camera measured the angles that drive the score, and whether the score holds under their measurement error";
   return (
-    <span
-      className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium"
-      style={{ borderColor: CONFIDENCE_COLORS[lvl], color: CONFIDENCE_COLORS[lvl] }}
-      title="Confidence: keypoint visibility × camera-view suitability × score stability under angle uncertainty"
-    >
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: CONFIDENCE_COLORS[lvl] }} />
-      {label ? `${lvl} confidence` : lvl}
-      <span className="tabular opacity-70">{Number.isFinite(conf) ? `${Math.round(conf * 100)}%` : ""}</span>
+    <span className="inline-flex flex-wrap items-center justify-center gap-1">
+      <span
+        className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium"
+        style={{ borderColor: CONFIDENCE_COLORS[lvl], color: CONFIDENCE_COLORS[lvl] }}
+        title={title}
+      >
+        <span className="h-1.5 w-1.5 rounded-full" style={{ background: CONFIDENCE_COLORS[lvl] }} />
+        {label ? `${lvl} confidence` : lvl}
+        <span className="tabular opacity-70">{Number.isFinite(conf) ? `${Math.round(conf * 100)}%` : ""}</span>
+      </span>
+      {near && (
+        <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800" title="Measurement error would often move this score to the neighbouring action level">
+          near cut-off
+        </span>
+      )}
     </span>
   );
 }

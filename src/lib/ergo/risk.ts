@@ -24,6 +24,9 @@ export function confidenceLevel(c: number): ConfidenceLevel {
   return c >= 0.75 ? "high" : c >= 0.5 ? "medium" : "low";
 }
 
+/** True when measurement error would often move the score to another action level. */
+export const nearCutoff = (s: { levelStability: number }) => s.levelStability < 0.6;
+
 export const CONFIDENCE_COLORS: Record<ConfidenceLevel, string> = {
   high: "#16a34a",
   medium: "#ca8a04",
@@ -41,8 +44,12 @@ export interface ScoreDetail {
 }
 
 export interface ScoredFrame extends ScoreDetail {
-  /** Confidence 0..1 combining input reliability and score stability */
+  /** Confidence 0..1: stability × √quality */
   conf: number;
-  /** Fraction of Monte Carlo perturbations that reproduced the same risk level */
+  /** Share of Monte Carlo re-scores within the score tolerance or on the same action level */
   stability: number;
+  /** Share of re-scores on the same action level; low means the posture is near a cut-off */
+  levelStability: number;
+  /** Measurement quality 0..1 of the inputs that can change this score */
+  quality: number;
 }

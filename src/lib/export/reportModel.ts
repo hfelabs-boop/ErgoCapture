@@ -270,7 +270,7 @@ export function buildSections(a: SessionAnalysis): Section[] {
           `${v.label} (${v.source}): coverage ${pct(v.coveragePct)}, mean keypoint visibility ${pct(v.meanVisibility * 100)}, mean view angle to body ${Number.isFinite(v.meanYaw) ? v.meanYaw.toFixed(0) + "°" : "–"} (0° = frontal, 90° = side).`,
       ),
       ...a.dataQuality.notes,
-      "Confidence combines keypoint visibility, how well the camera sees each joint's plane of motion, and score stability: every frame is re-scored with angles perturbed by their estimated error, and the share of re-scores landing on the same risk level is reported.",
+      "Confidence combines the measurement quality of the angles that can change a score (keypoint visibility and how well the camera sees each joint's plane of motion) with score stability: every frame is re-scored with angles perturbed by their estimated error, and the share of re-scores on the same action level or within one score point is used. Scores whose action level often changes under these errors are near a cut-off.",
     ],
   });
   return sec;
