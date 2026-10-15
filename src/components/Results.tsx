@@ -82,7 +82,7 @@ export function Results({ a }: { a: SessionAnalysis }) {
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 text-xl font-semibold hover:border-slate-200 focus:border-sky-500 focus:outline-none"
+          className="min-w-0 flex-1 basis-full rounded-md border border-transparent bg-transparent px-1 text-xl font-semibold hover:border-slate-200 focus:border-sky-500 focus:outline-none sm:basis-auto"
           aria-label="Assessment title"
         />
         <RiskBadge risk={a.overall.risk} text={`Overall: ${["negligible", "low", "medium", "high", "very high"][a.overall.risk]} risk`} size="lg" />

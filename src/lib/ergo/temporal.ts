@@ -137,6 +137,18 @@ export function handMovementsPerMin(ms: FrameMeasures[], fps: number, side: "L" 
   return dur > 0 ? (peaks.length / dur) * 60 : 0;
 }
 
+/** Seated: both thighs well forward of vertical with knees off the floor (unless set in task settings). */
+export function isSeated(f: FrameMeasures, s: TaskSettings): boolean {
+  if (s.seated === "yes") return true;
+  if (s.seated === "no") return false;
+  return f.valid && f.m.thighL > 55 && f.m.thighR > 55 && f.m.kneeHeight > 0.3 && f.m.locomotion < 0.3;
+}
+
+/** Hands-occupied heuristic: both hands close together, in front of the body. */
+export function handsHoldLoad(f: FrameMeasures): boolean {
+  return f.valid && f.m.handsGap < 0.5 && Math.max(f.m.reachL, f.m.reachR) > 0.2 && f.m.handHeightL < 1.6;
+}
+
 /** Per-frame context flags: static holds, repetitive work, rapid changes, load presence, seated. */
 export function frameContexts(ms: FrameMeasures[], fps: number, s: TaskSettings, cycles: CycleResult[]): FrameContext[] {
   const n = ms.length;
@@ -187,16 +199,8 @@ export function frameContexts(ms: FrameMeasures[], fps: number, s: TaskSettings,
     }),
   );
 
-  const seated = ms.map((f) => {
-    if (s.seated === "yes") return true;
-    if (s.seated === "no") return false;
-    return f.valid && f.m.thighL > 55 && f.m.thighR > 55 && f.m.kneeHeight > 0.3 && f.m.locomotion < 0.3;
-  });
-
-  // Hands-occupied heuristic: both hands close together, in front of the body.
-  const loadActive = ms.map(
-    (f) => f.valid && f.m.handsGap < 0.5 && Math.max(f.m.reachL, f.m.reachR) > 0.2 && f.m.handHeightL < 1.6,
-  );
+  const seated = ms.map((f) => isSeated(f, s));
+  const loadActive = ms.map(handsHoldLoad);
 
   return t.map((_, i) => ({
     staticHold: staticHold[i],

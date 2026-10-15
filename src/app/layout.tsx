@@ -22,16 +22,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className="min-h-screen">
         <header className="sticky top-0 z-30 border-b border-slate-800 bg-slate-900 text-white">
-          <nav className="mx-auto flex max-w-7xl items-center gap-1 px-4 py-2.5 sm:gap-4">
-            <Link href="/" className="mr-auto flex items-center gap-2 font-semibold tracking-tight">
+          <nav className="mx-auto flex max-w-7xl items-center gap-0.5 px-3 py-2.5 sm:gap-4 sm:px-4">
+            <Link href="/" className="mr-auto flex items-center gap-2 font-semibold tracking-tight" aria-label="ErgoCapture home">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
                 <circle cx="12" cy="4.5" r="2.5" fill="#38bdf8" />
                 <path d="M12 7.5v7m0 0-4 6m4-6 4 6M6 10.5l6-1.5 6 1.5" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" />
               </svg>
-              ErgoCapture
+              <span className="hidden min-[400px]:inline">ErgoCapture</span>
             </Link>
             {NAV.map((n) => (
-              <Link key={n.href} href={n.href} className="rounded-md px-2.5 py-1.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white">
+              <Link key={n.href} href={n.href} className="rounded-md px-2 py-1.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white sm:px-2.5">
                 {n.label}
               </Link>
             ))}
