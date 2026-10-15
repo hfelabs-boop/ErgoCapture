@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import type { SessionAnalysis } from "./ergo/analyze";
 import type { Narrative } from "./narrative/template";
+import type { PhotoAnalysis, PhotoOptions } from "./ergo/photos";
 import type { Calibration } from "./ergo/measures";
 import { DEFAULT_SETTINGS, type TaskSettings } from "./ergo/settings";
 import type { ModelVariant } from "./pose/detector";
@@ -32,6 +33,15 @@ export interface ViewSource {
   selectedPersonId?: number;
 }
 
+export interface PhotoSource {
+  id: string;
+  name: string;
+  file: File;
+  /** Object URL for thumbnails and overlays (memory only, never uploaded) */
+  url: string;
+  error?: string;
+}
+
 export interface Privacy {
   blurFaces: boolean;
   skeletonOnly: boolean;
@@ -58,6 +68,15 @@ interface State {
   privacy: Privacy;
   analysis: SessionAnalysis | null;
   title: string;
+  photos: PhotoSource[];
+  photoAnalysis: PhotoAnalysis | null;
+  photoOptions: PhotoOptions;
+  addPhotos: (p: PhotoSource[]) => void;
+  removePhoto: (id: string) => void;
+  clearPhotos: () => void;
+  updatePhoto: (id: string, patch: Partial<PhotoSource>) => void;
+  setPhotoAnalysis: (a: PhotoAnalysis | null) => void;
+  setPhotoOptions: (patch: Partial<PhotoOptions>) => void;
   /** AI-written narrative for the current analysis (null until generated) */
   aiNarrative: Narrative | null;
   /** Which narrative goes into reports and print */
@@ -99,6 +118,22 @@ export const useStore = create<State>((set, get) => ({
   title: "Workstation assessment",
   aiNarrative: null,
   reportNarrative: "template",
+  photos: [],
+  photoAnalysis: null,
+  photoOptions: { staticHold: false, repetitive: false },
+  addPhotos: (p) => set({ photos: [...get().photos, ...p] }),
+  removePhoto: (id) => {
+    const p = get().photos.find((x) => x.id === id);
+    if (p) URL.revokeObjectURL(p.url);
+    set({ photos: get().photos.filter((x) => x.id !== id) });
+  },
+  clearPhotos: () => {
+    for (const p of get().photos) URL.revokeObjectURL(p.url);
+    set({ photos: [], photoAnalysis: null });
+  },
+  updatePhoto: (id, patch) => set({ photos: get().photos.map((p) => (p.id === id ? { ...p, ...patch } : p)) }),
+  setPhotoAnalysis: (photoAnalysis) => set({ photoAnalysis }),
+  setPhotoOptions: (patch) => set({ photoOptions: { ...get().photoOptions, ...patch } }),
   // Reports keep the standard narrative until the user explicitly picks the AI one.
   setAiNarrative: (aiNarrative) => set({ aiNarrative, reportNarrative: "template" }),
   setReportNarrative: (reportNarrative) => set({ reportNarrative }),
@@ -135,7 +170,8 @@ export const useStore = create<State>((set, get) => ({
   setTitle: (title) => set({ title }),
   reset: () => {
     for (const v of get().views) if (v.url) URL.revokeObjectURL(v.url);
-    set({ views: [], analysis: null, calib: {} });
+    for (const p of get().photos) URL.revokeObjectURL(p.url);
+    set({ views: [], analysis: null, calib: {}, photos: [], photoAnalysis: null });
   },
 }));
 

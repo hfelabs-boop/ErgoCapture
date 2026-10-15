@@ -1,13 +1,16 @@
 "use client";
 
 import { useDownloadGate } from "@/components/DownloadGate";
+import { PhotoResults } from "@/components/PhotoResults";
 import { Results } from "@/components/Results";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { Button, Card, Field, NumberInput, Progress, Select, Toggle } from "@/components/ui";
 import { analyzeSession } from "@/lib/ergo/analyze";
 import { parsePoseJson } from "@/lib/pose/importExport";
 import { demoTrack } from "@/lib/pose/synthetic";
-import { ENGINES, type EngineId } from "@/lib/pose/engines";
+import { analyzePhotos } from "@/lib/ergo/photos";
+import { defaultEngine, ENGINES, type EngineId } from "@/lib/pose/engines";
+import { detectPhotos } from "@/lib/pose/photoProcessor";
 import { checkServer, processRemote } from "@/lib/pose/remoteProcessor";
 import { processVideo } from "@/lib/pose/videoProcessor";
 import { hydrateSettings, newId, selectedTracks, useStore, type ViewSource } from "@/lib/store";
@@ -73,6 +76,12 @@ function Analyze() {
         } catch (e) {
           setError((e as Error).message);
         }
+      } else if (file.type.startsWith("image/") || /\.(jpe?g|png|webp|bmp|gif|hei[cf])$/i.test(file.name)) {
+        if (useStore.getState().photos.length >= 50) {
+          setError("Up to 50 photos per assessment.");
+          break;
+        }
+        s.addPhotos([{ id: newId(), name: file.name, file, url: URL.createObjectURL(file) }]);
       } else if (file.type.startsWith("video/") || /\.(mp4|mov|webm|mkv|m4v)$/i.test(file.name)) {
         if (useStore.getState().views.length >= 4) {
           setError("Up to 4 camera views are supported.");
@@ -168,6 +177,53 @@ function Analyze() {
     }
   };
 
+  const [photoProgress, setPhotoProgress] = useState<string | null>(null);
+  const runPhotos = async () => {
+    setError(null);
+    const st = useStore.getState();
+    // The SAM 3D Body server works on videos; photos use the browser engine.
+    let engine: Exclude<EngineId, "sam3d"> = st.process.engine === "sam3d" ? defaultEngine() : st.process.engine;
+    const chosen = await gate(engine);
+    if (!chosen || chosen === "sam3d") return;
+    engine = chosen;
+    abort.current = new AbortController();
+    setPhotoProgress("Loading pose model…");
+    try {
+      for (const p of st.photos) st.updatePhoto(p.id, { error: undefined });
+      const inputs = await detectPhotos(
+        st.photos.map((p) => ({ id: p.id, name: p.name, file: p.file })),
+        engine,
+        {
+          statureM: st.settings.subjectHeightCm > 0 ? st.settings.subjectHeightCm / 100 : undefined,
+          signal: abort.current.signal,
+          onProgress: (done, total, msg) => setPhotoProgress(msg ?? `Analysing photos… ${done} / ${total}`),
+          onError: (job, message) => st.updatePhoto(job.id, { error: message }),
+        },
+      );
+      const s2 = useStore.getState();
+      s2.setPhotoAnalysis(analyzePhotos(inputs, s2.settings, s2.calib, s2.photoOptions));
+    } catch (e) {
+      if ((e as Error).name !== "AbortError") setError((e as Error).message);
+    } finally {
+      setPhotoProgress(null);
+    }
+  };
+
+  if (s.photoAnalysis)
+    return (
+      <div className="space-y-4">
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => s.setPhotoAnalysis(null)}>
+            ← Sources and settings
+          </Button>
+          <Button variant="ghost" onClick={() => s.reset()}>
+            New assessment
+          </Button>
+        </div>
+        <PhotoResults pa={s.photoAnalysis} />
+      </div>
+    );
+
   if (s.analysis)
     return (
       <div className="space-y-4">
@@ -190,7 +246,7 @@ function Analyze() {
       <div>
         <h1 className="text-2xl font-semibold">Analyze recordings</h1>
         <p className="text-sm text-slate-500">
-          Add 1–4 videos of the same task from different angles (or a saved skeleton session), set the task inputs, and run.{" "}
+          Add 1–4 videos of the same task from different angles (or a saved skeleton session), or several photos, set the task inputs, and run.{" "}
           {s.process.engine === "sam3d" ? "Videos are sent to your SAM 3D Body server for pose estimation; scoring runs in this browser." : "Everything is processed in this browser."}
         </p>
       </div>
@@ -204,15 +260,17 @@ function Analyze() {
               Load demo
             </Button>
             <label className="inline-flex cursor-pointer items-center rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700">
-              Add video / session
-              <input type="file" multiple accept="video/*,.json,application/json" className="hidden" onChange={(e) => addFiles(e.target.files)} />
+              Add video / photos / session
+              <input type="file" multiple accept="video/*,image/*,.json,application/json" className="hidden" onChange={(e) => addFiles(e.target.files)} />
             </label>
           </>
         }
       >
-        {s.views.length === 0 ? (
+        {s.views.length === 0 && s.photos.length > 0 ? (
+          <p className="text-sm text-slate-500">No videos added. Photos are listed below.</p>
+        ) : s.views.length === 0 ? (
           <div className="rounded-lg border-2 border-dashed border-slate-200 p-8 text-center text-sm text-slate-500" onDragOver={(e) => e.preventDefault()} onDrop={(e) => (e.preventDefault(), addFiles(e.dataTransfer.files))}>
-            Drop videos here (MP4, MOV, WebM) or a <code>.json</code> skeleton session.
+            Drop videos (MP4, MOV, WebM), photos (JPG, PNG, WebP) or a <code>.json</code> skeleton session here.
             <br />
             Tip: film from the side at hip height with the whole body in frame. A second camera at ~90° greatly improves accuracy.
           </div>
@@ -241,6 +299,73 @@ function Analyze() {
           </div>
         )}
       </Card>
+
+      {s.photos.length > 0 && (
+        <Card
+          title={`Photos (${s.photos.length})`}
+          actions={
+            <Button variant="ghost" onClick={() => s.clearPhotos()} disabled={!!photoProgress}>
+              Remove all
+            </Button>
+          }
+        >
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-8">
+            {s.photos.map((p) => (
+              <div key={p.id} className="group relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.url} alt={p.name} className="aspect-square w-full rounded-md object-cover" />
+                <button
+                  onClick={() => s.removePhoto(p.id)}
+                  disabled={!!photoProgress}
+                  className="absolute top-1 right-1 rounded-full bg-slate-900/70 px-1.5 text-xs text-white"
+                  aria-label={`Remove ${p.name}`}
+                >
+                  ×
+                </button>
+                <div className="truncate text-[11px] text-slate-500" title={p.name}>
+                  {p.name}
+                </div>
+                {p.error && <div className="text-[11px] text-red-600">{p.error}</div>}
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-4">
+            <Toggle
+              checked={s.photoOptions.staticHold}
+              onChange={(v) => s.setPhotoOptions({ staticHold: v })}
+              label="Postures are held for more than 1 minute"
+            />
+            <Toggle
+              checked={s.photoOptions.repetitive}
+              onChange={(v) => s.setPhotoOptions({ repetitive: v })}
+              label="Postures are repeated more than 4 times per minute"
+            />
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            Each photo is scored on its own (RULA, REBA, OWAS with confidence). Repetition, lifting, OCRA, Strain Index and holding times need video. Uses the pose engine
+            selected under Processing{s.process.engine === "sam3d" ? " (the SAM 3D Body server takes videos only, so photos use the browser engine)" : ""}.
+          </p>
+          {s.process.engine === "mediapipe" && (
+            <p className="mt-1 rounded-md bg-amber-50 px-2 py-1.5 text-xs text-amber-800">
+              On single photos MediaPipe is noticeably less reliable than RTMW (no neighbouring video frames to steady it). For photo assessments, RTMW is recommended where
+              the device allows its one-time download.
+            </p>
+          )}
+          <div className="mt-3 flex items-center gap-3">
+            <Button onClick={runPhotos} disabled={!!photoProgress}>
+              {photoProgress ? "Analysing…" : `Analyze ${s.photos.length} photo${s.photos.length > 1 ? "s" : ""}`}
+            </Button>
+            {photoProgress && (
+              <>
+                <span className="text-sm text-slate-600">{photoProgress}</span>
+                <Button variant="secondary" onClick={() => abort.current?.abort()}>
+                  Cancel
+                </Button>
+              </>
+            )}
+          </div>
+        </Card>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card title="Processing">

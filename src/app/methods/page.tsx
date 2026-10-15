@@ -145,6 +145,20 @@ export default function Methods() {
         />
       </S>
 
+      <S id="photos" title="3a. Photo assessments">
+        <p>
+          Several still photos can be added on the Analyze page. Each photo is analysed on its own with the selected browser pose engine (the main, largest person is
+          used; phone photos are turned upright from their EXIF orientation) and scored with RULA, REBA and OWAS, each with a confidence level. Results list all photos,
+          highest risk first, with the risk-coloured skeleton, the reasons behind each score and the joint angles, and export to PDF, Word, CSV and print.
+        </p>
+        <p>
+          A photo is a snapshot, so methods that need movement over time (repetition counting, NIOSH lifting, OCRA, Strain Index, holding times) are not applied. Two
+          options add the RULA muscle-use and REBA activity points when you know the posture is held over 1 minute or repeated over 4 times per minute. Body proportions
+          are estimated across the photo set, assuming it shows one worker. On single photos RTMW is clearly more reliable than MediaPipe, which has no neighbouring
+          frames to steady it.
+        </p>
+      </S>
+
       <S id="narrative" title="3b. Narrative report">
         <p>
           <b>Standard narrative.</b> Written by the app directly from the computed results: overview, working postures, highest-risk moments, assessment results,
