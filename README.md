@@ -8,6 +8,15 @@ Camera-based ergonomic posture analysis that runs in the browser. Record a worke
 
 **Privacy:** video never leaves the device. Faces are blurred by default, and a "skeleton only" mode hides and discards video.
 
+## Documentation
+
+- [User guide](docs/user-guide.md) — capturing, workflows, engines, task inputs, results, reports, privacy
+- [Validity of the analytical methods](docs/validity.md) — evidence for each method and for camera-based measurement, verification status, limitations, validation plan
+- [Methods reference](docs/methods.md) — every angle, threshold and deviation from the published methods
+- [Technical reference](docs/technical.md) — architecture, file formats, models and licences, deployment
+
+The same pages are available in the app at `/docs`.
+
 ## Run locally
 
 ```bash
